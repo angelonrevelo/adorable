@@ -55,7 +55,7 @@ export function IDEChatPanel() {
             // Get current project files for context
             const projectFiles = Array.from(files.values());
 
-            const result = await generateVibe(userInput, history);
+            const result = await generateVibe(userInput, history, projectFiles);
 
             // Add assistant message
             addMessage({

@@ -12,9 +12,10 @@ import { ProjectDashboard } from '@/components/ProjectDashboard';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { ProjectService } from '@/services/projectService';
 import { templates } from '@/templates/projectTemplates';
-import { Home, Save, Loader2 } from 'lucide-react';
+import { Home, Save, Loader2, Code2, X, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 function ResizeHandle({ className }: { className?: string }) {
     return (
@@ -28,6 +29,7 @@ function ResizeHandle({ className }: { className?: string }) {
 export default function IDE() {
     const { project, files, createProject, loadProject, clearProject } = useProjectStore();
     const [showDashboard, setShowDashboard] = useState(!project);
+    const [showCodePanel, setShowCodePanel] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const { toast } = useToast();
 
@@ -137,79 +139,117 @@ export default function IDE() {
 
     return (
         <div className="h-screen flex flex-col bg-[#0a0a0f] overflow-hidden">
-            {/* Top Bar */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-[#0d0d12]">
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleGoHome}
-                        className="text-gray-400 hover:text-white"
-                    >
-                        <Home className="w-4 h-4 mr-1" />
-                        Home
-                    </Button>
-                    {project && (
-                        <span className="text-sm text-gray-500 border-l border-white/10 pl-3 ml-1">
-                            {project.name}
-                        </span>
-                    )}
+            {/* Main Content: Chat + Preview */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left: Chat Panel */}
+                <div className="w-[320px] min-w-[280px] max-w-[400px] flex-shrink-0 border-r border-white/5">
+                    <IDEChatPanel />
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleSave}
-                        disabled={isSaving || !project}
-                        className="text-gray-400 hover:text-white"
-                    >
-                        {isSaving ? (
-                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                        ) : (
-                            <Save className="w-4 h-4 mr-1" />
-                        )}
-                        Save
-                    </Button>
+
+                {/* Right: Preview (Full width when code panel closed) */}
+                <div className="flex-1 flex flex-col min-w-0 relative">
+                    {/* Preview Header */}
+                    <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-[#0d0d12]">
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleGoHome}
+                                className="text-gray-400 hover:text-white"
+                            >
+                                <Home className="w-4 h-4 mr-1" />
+                                Home
+                            </Button>
+                            {project && (
+                                <span className="text-sm text-gray-500 border-l border-white/10 pl-3 ml-1">
+                                    {project.name}
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleSave}
+                                disabled={isSaving || !project}
+                                className="text-gray-400 hover:text-white"
+                            >
+                                {isSaving ? (
+                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                ) : (
+                                    <Save className="w-4 h-4 mr-1" />
+                                )}
+                                Save
+                            </Button>
+                            <Button
+                                variant={showCodePanel ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={() => setShowCodePanel(!showCodePanel)}
+                                className={cn(
+                                    "transition-colors",
+                                    showCodePanel
+                                        ? "bg-purple-600 text-white hover:bg-purple-700"
+                                        : "border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
+                                )}
+                            >
+                                <Code2 className="w-4 h-4 mr-1" />
+                                Code
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Preview Area */}
+                    <div className="flex-1 overflow-hidden">
+                        <PreviewPanel />
+                    </div>
                 </div>
             </div>
 
-            {/* Main Content */}
-            <PanelGroup direction="horizontal" className="flex-1">
-                {/* Left: Chat Panel */}
-                <Panel defaultSize={25} minSize={20} maxSize={35}>
-                    <IDEChatPanel />
-                </Panel>
+            {/* Code Panel Overlay (Slides in from right) */}
+            <div
+                className={cn(
+                    "fixed inset-y-0 right-0 w-[600px] max-w-[80vw] bg-[#0d0d12] border-l border-white/10",
+                    "transform transition-transform duration-300 ease-in-out z-50 shadow-2xl",
+                    showCodePanel ? "translate-x-0" : "translate-x-full"
+                )}
+            >
+                {/* Code Panel Header */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-white/5">
+                    <div className="flex items-center gap-2">
+                        <Code2 className="w-4 h-4 text-purple-400" />
+                        <span className="text-sm font-medium text-white">Code</span>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowCodePanel(false)}
+                        className="text-gray-400 hover:text-white"
+                    >
+                        <X className="w-4 h-4" />
+                    </Button>
+                </div>
 
-                <ResizeHandle />
+                {/* Code Panel Content: File Tree + Editor */}
+                <div className="flex h-[calc(100%-49px)]">
+                    {/* File Tree */}
+                    <div className="w-[200px] border-r border-white/5 flex-shrink-0">
+                        <FileTree />
+                    </div>
 
-                {/* Middle: File Tree + Editor */}
-                <Panel defaultSize={40} minSize={30}>
-                    <PanelGroup direction="horizontal">
-                        {/* File Tree */}
-                        {project && (
-                            <>
-                                <Panel defaultSize={25} minSize={15} maxSize={40}>
-                                    <FileTree />
-                                </Panel>
-                                <ResizeHandle />
-                            </>
-                        )}
+                    {/* Editor */}
+                    <div className="flex-1 min-w-0">
+                        <EditorPanel />
+                    </div>
+                </div>
+            </div>
 
-                        {/* Editor */}
-                        <Panel defaultSize={project ? 75 : 100}>
-                            <EditorPanel />
-                        </Panel>
-                    </PanelGroup>
-                </Panel>
-
-                <ResizeHandle />
-
-                {/* Right: Preview */}
-                <Panel defaultSize={35} minSize={25}>
-                    <PreviewPanel />
-                </Panel>
-            </PanelGroup>
+            {/* Overlay backdrop when code panel is open */}
+            {showCodePanel && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+                    onClick={() => setShowCodePanel(false)}
+                />
+            )}
         </div>
     );
 }
-
