@@ -13,7 +13,9 @@ import {
     ChevronUp,
     MessageSquare,
     ArrowUp,
-    Bug
+    Bug,
+    AlertTriangle,
+    Wrench
 } from 'lucide-react';
 import { DebugPanel, DebugInfo } from './DebugPanel';
 import { cn } from '@/lib/utils';
@@ -40,6 +42,8 @@ export function IDEChatPanel() {
         setGenerating,
         applyFileOperations,
         createProject,
+        sandpackError,
+        clearSandpackError,
     } = useProjectStore();
 
     const [input, setInput] = useState('');
@@ -132,6 +136,51 @@ export function IDEChatPanel() {
             setGenerating(false);
         }
     }, [input, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations]);
+
+    // Handle Fix error button click
+    const handleFixError = useCallback(async () => {
+        if (!sandpackError || isGenerating) return;
+
+        // Build a fix prompt with error context
+        const fixPrompt = `Fix this error:\n\n${sandpackError}\n\nPlease analyze the error and fix the code.`;
+
+        addMessage({
+            role: 'user',
+            content: fixPrompt,
+        });
+
+        clearSandpackError();
+        setGenerating(true);
+
+        try {
+            const history = messages.map((m: ConversationMessage) => ({
+                role: m.role,
+                content: m.content,
+            }));
+
+            const projectFiles = Array.from(files.values());
+            const result = await generateVibe(fixPrompt, history, projectFiles);
+
+            addMessage({
+                role: 'assistant',
+                content: result.message || `I've fixed the error. Check the preview!`,
+                thought: result.thought,
+                fileOperations: result.files,
+            });
+
+            if (result.files && result.files.length > 0) {
+                applyFileOperations(result.files);
+            }
+        } catch (error) {
+            console.error('Error fixing:', error);
+            addMessage({
+                role: 'assistant',
+                content: 'Sorry, there was an error trying to fix the code. Please try again.',
+            });
+        } finally {
+            setGenerating(false);
+        }
+    }, [sandpackError, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations, clearSandpackError]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -378,6 +427,28 @@ export function IDEChatPanel() {
                                     </div>
                                     <span className="text-sm text-gray-400">Generating...</span>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Error Fix Button */}
+                        {sandpackError && !isGenerating && (
+                            <div className="animate-fade-in space-y-2">
+                                <div className="flex items-start gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl">
+                                    <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-red-400 mb-1">Error in preview</p>
+                                        <p className="text-xs text-red-300/80 font-mono break-all">
+                                            {sandpackError.slice(0, 200)}{sandpackError.length > 200 ? '...' : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleFixError}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white rounded-xl transition-all shadow-lg text-sm font-medium"
+                                >
+                                    <Wrench className="w-4 h-4" />
+                                    Try to Fix
+                                </button>
                             </div>
                         )}
                         <div ref={messagesEndRef} />

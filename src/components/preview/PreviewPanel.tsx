@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
     SandpackProvider,
     SandpackPreview,
@@ -72,6 +72,17 @@ function PreviewToolbar() {
 function PreviewContent() {
     const [showConsole, setShowConsole] = useState(false);
     const [viewport, setViewport] = useState<ViewportSize>('desktop');
+    const { sandpack } = useSandpack();
+    const { setSandpackError, clearSandpackError } = useProjectStore();
+
+    // Capture Sandpack errors and send to store
+    useEffect(() => {
+        if (sandpack.error) {
+            setSandpackError(sandpack.error.message);
+        } else {
+            clearSandpackError();
+        }
+    }, [sandpack.error, setSandpackError, clearSandpackError]);
 
     return (
         <div className="absolute inset-0 flex flex-col">

@@ -79,6 +79,9 @@ interface ProjectStore {
     messages: ConversationMessage[];
     isGenerating: boolean;
 
+    // Error state for Sandpack
+    sandpackError: string | null;
+
     // Project actions
     createProject: (name: string, templateFiles?: Omit<ProjectFile, 'id'>[]) => void;
     loadProject: (project: Project, files: ProjectFile[]) => void;
@@ -101,6 +104,10 @@ interface ProjectStore {
     addMessage: (message: Omit<ConversationMessage, 'id' | 'timestamp'>) => void;
     setGenerating: (isGenerating: boolean) => void;
     clearMessages: () => void;
+
+    // Error actions
+    setSandpackError: (error: string | null) => void;
+    clearSandpackError: () => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -112,6 +119,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     openFiles: [],
     messages: [],
     isGenerating: false,
+    sandpackError: null,
 
     // Project actions
     createProject: (name, templateFiles) => {
@@ -330,5 +338,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     clearMessages: () => {
         set({ messages: [] });
+    },
+
+    // Error actions
+    setSandpackError: (error) => {
+        set({ sandpackError: error });
+    },
+
+    clearSandpackError: () => {
+        set({ sandpackError: null });
     },
 }));
