@@ -113,11 +113,11 @@ function PreviewContent() {
             </div>
 
             <div
-                className="flex-1 bg-white overflow-hidden flex items-start justify-center p-4"
+                className="flex-1 overflow-hidden flex items-stretch justify-center"
                 style={{ backgroundColor: '#1a1a24' }}
             >
                 <div
-                    className="h-full bg-white rounded-lg overflow-hidden shadow-2xl transition-all duration-300"
+                    className="h-full bg-white overflow-hidden transition-all duration-300"
                     style={{
                         width: viewportSizes[viewport].width,
                         maxWidth: '100%',
@@ -127,7 +127,7 @@ function PreviewContent() {
                         showNavigator={false}
                         showRefreshButton={false}
                         showOpenInCodeSandbox={false}
-                        style={{ height: '100%' }}
+                        style={{ height: '100%', width: '100%' }}
                     />
                 </div>
             </div>
@@ -194,7 +194,7 @@ export function PreviewPanel() {
     }
 
     return (
-        <div className="flex-1 flex flex-col bg-[#0a0a0f] min-w-0">
+        <div className="h-full flex flex-col bg-[#0a0a0f] min-w-0">
             <SandpackProvider
                 template="react-ts"
                 files={sandpackFiles}

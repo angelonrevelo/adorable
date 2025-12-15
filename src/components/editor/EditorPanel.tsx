@@ -93,7 +93,7 @@ export function EditorPanel() {
     }
 
     return (
-        <div className="flex-1 flex flex-col bg-[#0a0a0f] min-w-0">
+        <div className="h-full flex flex-col bg-[#0a0a0f] min-w-0">
             <EditorTabs />
 
             <div className="flex-1 overflow-hidden">

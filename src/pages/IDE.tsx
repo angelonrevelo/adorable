@@ -230,14 +230,14 @@ export default function IDE() {
                 </div>
 
                 {/* Code Panel Content: File Tree + Editor */}
-                <div className="flex h-[calc(100%-49px)]">
+                <div className="absolute inset-0 top-[49px] flex">
                     {/* File Tree */}
-                    <div className="w-[200px] border-r border-white/5 flex-shrink-0">
+                    <div className="w-[200px] border-r border-white/5 flex-shrink-0 overflow-y-auto">
                         <FileTree />
                     </div>
 
                     {/* Editor */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 h-full">
                         <EditorPanel />
                     </div>
                 </div>
