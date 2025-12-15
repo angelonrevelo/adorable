@@ -15,9 +15,11 @@ import {
     ArrowUp,
     Bug,
     AlertTriangle,
-    Wrench
+    Wrench,
+    Brain
 } from 'lucide-react';
-import { DebugPanel, DebugInfo } from './DebugPanel';
+import { AIActivityPanel } from './AIActivityPanel';
+import { useActivityStore } from '@/stores/useActivityStore';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { templates } from '@/templates/projectTemplates';
@@ -48,12 +50,22 @@ export function IDEChatPanel() {
         clearSandpackError,
     } = useProjectStore();
 
+    const {
+        startSession,
+        endSession,
+        startThinking,
+        stopThinking,
+        addReading,
+        addEditing,
+        addExplaining,
+        addError,
+    } = useActivityStore();
+
     const [input, setInput] = useState('');
     const [isLoadingIdea, setIsLoadingIdea] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
-    const [showDebug, setShowDebug] = useState(false);
-    const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+    const [showActivity, setShowActivity] = useState(false);
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -105,30 +117,42 @@ export function IDEChatPanel() {
 
         setGenerating(true);
 
+        // Start activity session and show panel
+        startSession();
+        setShowActivity(true);
+
+        // Show reading activities for files being sent
+        const projectFiles = Array.from(files.values());
+        projectFiles.forEach(file => {
+            addReading(file.path.split('/').pop() || file.path);
+        });
+
+        // Start thinking activity
+        const thinkingId = startThinking();
+
         try {
             const history = messages.map((m: ConversationMessage) => ({
                 role: m.role,
                 content: m.content,
             }));
 
-            const projectFiles = Array.from(files.values());
-            const startTime = Date.now();
             const result = await generateVibe(userInput, history, projectFiles);
-            const duration = Date.now() - startTime;
 
-            // Capture debug info
-            setDebugInfo({
-                userPrompt: userInput,
-                rawResponse: result.debugInfo?.rawResponse,
-                parsedResponse: {
-                    thought: result.thought,
-                    message: result.message,
-                    files: result.files?.map(f => ({ path: f.path, action: f.action })),
-                    html: result.html ? 'HTML content present' : undefined,
-                },
-                timestamp: new Date().toISOString(),
-                duration,
-            });
+            // Stop thinking timer
+            stopThinking(thinkingId);
+
+            // Add AI's explanation
+            if (result.thought) {
+                addExplaining(result.thought.slice(0, 100) + (result.thought.length > 100 ? '...' : ''));
+            }
+
+            // Add file operations to activity stream
+            if (result.files && result.files.length > 0) {
+                result.files.forEach(file => {
+                    const fileName = file.path.split('/').pop() || file.path;
+                    addEditing(fileName, file.action);
+                });
+            }
 
             addMessage({
                 role: 'assistant',
@@ -142,18 +166,17 @@ export function IDEChatPanel() {
             }
         } catch (error) {
             console.error('Error generating:', error);
-            setDebugInfo(prev => ({
-                ...prev,
-                error: error instanceof Error ? error.message : 'Unknown error',
-            }));
+            stopThinking(thinkingId);
+            addError(error instanceof Error ? error.message : 'Unknown error');
             addMessage({
                 role: 'assistant',
                 content: 'Sorry, there was an error generating your code. Please try again.',
             });
         } finally {
             setGenerating(false);
+            endSession();
         }
-    }, [input, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations]);
+    }, [input, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations, startSession, endSession, startThinking, stopThinking, addReading, addEditing, addExplaining, addError]);
 
     // Handle Fix error button click
     const handleFixError = useCallback(async () => {
@@ -575,18 +598,18 @@ export function IDEChatPanel() {
                                     <Dices className="w-4 h-4" />
                                 )}
                             </button>
-                            {/* Debug toggle */}
+                            {/* Activity panel toggle */}
                             <button
-                                onClick={() => setShowDebug(!showDebug)}
+                                onClick={() => setShowActivity(!showActivity)}
                                 className={cn(
                                     'p-2 rounded-lg transition-colors',
-                                    showDebug
+                                    showActivity
                                         ? 'bg-yellow-500/20 text-yellow-400'
                                         : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 )}
-                                title="Toggle Debug Panel"
+                                title="Toggle AI Activity"
                             >
-                                <Bug className="w-4 h-4" />
+                                <Brain className="w-4 h-4" />
                             </button>
                         </div>
 
@@ -615,14 +638,11 @@ export function IDEChatPanel() {
                     </div>
                 </div>
 
-                {/* Debug Panel */}
-                {showDebug && (
-                    <DebugPanel
-                        debugInfo={debugInfo}
-                        isVisible={showDebug}
-                        onToggle={() => setShowDebug(false)}
-                    />
-                )}
+                {/* AI Activity Panel */}
+                <AIActivityPanel
+                    isVisible={showActivity}
+                    onToggle={() => setShowActivity(false)}
+                />
             </div>
         </div>
     );
