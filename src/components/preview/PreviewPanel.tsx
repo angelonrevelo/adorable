@@ -194,27 +194,29 @@ export function PreviewPanel() {
     }
 
     return (
-        <div className="h-full flex flex-col bg-[#0a0a0f] min-w-0">
-            <SandpackProvider
-                template="react-ts"
-                files={sandpackFiles}
-                theme="dark"
-                options={{
-                    autorun: true,
-                    autoReload: true,
-                    recompileMode: 'delayed',
-                    recompileDelay: 500,
-                }}
-                customSetup={{
-                    dependencies: {
-                        'react': '^18.2.0',
-                        'react-dom': '^18.2.0',
-                    },
-                    entry: '/src/main.tsx',
-                }}
-            >
-                <PreviewContent />
-            </SandpackProvider>
+        <div className="h-full w-full relative bg-[#0a0a0f]">
+            <div className="absolute inset-0 flex flex-col">
+                <SandpackProvider
+                    template="react-ts"
+                    files={sandpackFiles}
+                    theme="dark"
+                    options={{
+                        autorun: true,
+                        autoReload: true,
+                        recompileMode: 'delayed',
+                        recompileDelay: 500,
+                    }}
+                    customSetup={{
+                        dependencies: {
+                            'react': '^18.2.0',
+                            'react-dom': '^18.2.0',
+                        },
+                        entry: '/src/main.tsx',
+                    }}
+                >
+                    <PreviewContent />
+                </SandpackProvider>
+            </div>
         </div>
     );
 }
