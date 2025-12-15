@@ -326,97 +326,72 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   ],
 };
 
+// Modern App Template - Single page with tab navigation (no react-router-dom needed)
 export const modernTemplate: ProjectTemplate = {
   id: 'modern-app',
   name: 'Modern App',
-  description: 'Tailwind + Components + Routing',
+  description: 'Tailwind + Components',
   icon: '🚀',
   dependencies: {
     'react': '^18.2.0',
     'react-dom': '^18.2.0',
-    'react-router-dom': '^6.20.0',
   },
   files: [
     {
       path: 'src/App.tsx',
       language: 'tsx',
       isEntryPoint: false,
-      content: `import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import About from './pages/About';
+      content: `import { useState } from 'react';
+
+type Page = 'home' | 'about';
 
 function App() {
-  return (
-    <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
-  );
-}
+  const [currentPage, setCurrentPage] = useState<Page>('home');
 
-export default App;
-`,
-    },
-    {
-      path: 'src/components/Layout.tsx',
-      language: 'tsx',
-      content: `import { Link, useLocation } from 'react-router-dom';
-
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
-export default function Layout({ children }: LayoutProps) {
-  const location = useLocation();
-  
-  const navItems = [
-    { path: '/', label: 'Home' },
-    { path: '/about', label: 'About' },
-  ];
-  
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Navbar */}
       <nav className="sticky top-0 z-50 backdrop-blur-xl bg-white/70 border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white font-bold">
                 K
               </div>
               <span className="font-semibold text-slate-900">MyApp</span>
-            </Link>
+            </div>
             
-            {/* Nav Links */}
             <div className="flex items-center gap-1">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={\`px-4 py-2 rounded-lg text-sm font-medium transition-colors \${
-                    location.pathname === item.path
-                      ? 'bg-violet-100 text-violet-700'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                  }\`}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              <button
+                onClick={() => setCurrentPage('home')}
+                className={\`px-4 py-2 rounded-lg text-sm font-medium transition-colors \${
+                  currentPage === 'home'
+                    ? 'bg-violet-100 text-violet-700'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }\`}
+              >
+                Home
+              </button>
+              <button
+                onClick={() => setCurrentPage('about')}
+                className={\`px-4 py-2 rounded-lg text-sm font-medium transition-colors \${
+                  currentPage === 'about'
+                    ? 'bg-violet-100 text-violet-700'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }\`}
+              >
+                About
+              </button>
             </div>
           </div>
         </div>
       </nav>
       
-      {/* Main Content */}
-      <main>{children}</main>
+      <main>
+        {currentPage === 'home' && <HomePage />}
+        {currentPage === 'about' && <AboutPage />}
+      </main>
       
-      {/* Footer */}
       <footer className="border-t border-slate-200 py-8 mt-auto">
         <div className="max-w-6xl mx-auto px-4 text-center text-sm text-slate-500">
           © 2024 MyApp. All rights reserved.
@@ -425,136 +400,10 @@ export default function Layout({ children }: LayoutProps) {
     </div>
   );
 }
-`,
-    },
-    {
-      path: 'src/components/ui/Button.tsx',
-      language: 'tsx',
-      content: `interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  children: React.ReactNode;
-}
 
-export default function Button({ 
-  variant = 'primary', 
-  size = 'md', 
-  children, 
-  className = '',
-  ...props 
-}: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
-  
-  const variants = {
-    primary: 'bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 focus:ring-violet-500 shadow-lg shadow-violet-500/25',
-    secondary: 'bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-500',
-    outline: 'border-2 border-slate-200 text-slate-700 hover:bg-slate-50 focus:ring-slate-500',
-    ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-500',
-  };
-  
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm gap-1.5',
-    md: 'px-5 py-2.5 text-sm gap-2',
-    lg: 'px-6 py-3 text-base gap-2',
-  };
-  
-  return (
-    <button
-      className={\`\${baseStyles} \${variants[variant]} \${sizes[size]} \${className}\`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
-`,
-    },
-    {
-      path: 'src/components/ui/Card.tsx',
-      language: 'tsx',
-      content: `interface CardProps {
-  children: React.ReactNode;
-  className?: string;
-  glass?: boolean;
-}
-
-export function Card({ children, className = '', glass = false }: CardProps) {
-  const baseStyles = glass
-    ? 'backdrop-blur-xl bg-white/60 border border-white/20 shadow-xl'
-    : 'bg-white border border-slate-200 shadow-sm';
-    
-  return (
-    <div className={\`rounded-2xl \${baseStyles} \${className}\`}>
-      {children}
-    </div>
-  );
-}
-
-export function CardHeader({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={\`px-6 py-4 border-b border-slate-100 \${className}\`}>
-      {children}
-    </div>
-  );
-}
-
-export function CardContent({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={\`px-6 py-4 \${className}\`}>
-      {children}
-    </div>
-  );
-}
-
-export function CardFooter({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={\`px-6 py-4 border-t border-slate-100 \${className}\`}>
-      {children}
-    </div>
-  );
-}
-`,
-    },
-    {
-      path: 'src/components/ui/Input.tsx',
-      language: 'tsx',
-      content: `interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
-}
-
-export default function Input({ label, error, className = '', ...props }: InputProps) {
-  return (
-    <div className="space-y-1.5">
-      {label && (
-        <label className="block text-sm font-medium text-slate-700">
-          {label}
-        </label>
-      )}
-      <input
-        className={\`w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all \${
-          error ? 'border-red-500 focus:ring-red-500' : ''
-        } \${className}\`}
-        {...props}
-      />
-      {error && (
-        <p className="text-sm text-red-500">{error}</p>
-      )}
-    </div>
-  );
-}
-`,
-    },
-    {
-      path: 'src/pages/Home.tsx',
-      language: 'tsx',
-      content: `import Button from '../components/ui/Button';
-import { Card, CardContent } from '../components/ui/Card';
-
-export default function Home() {
+function HomePage() {
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-violet-100 text-violet-700 text-sm font-medium mb-6">
@@ -569,21 +418,20 @@ export default function Home() {
           </h1>
           
           <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">
-            A modern template with beautiful components, routing, and everything you need to ship fast.
+            A modern template with beautiful components.
           </p>
           
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Button size="lg">
+            <button className="px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all">
               Get Started →
-            </Button>
-            <Button variant="outline" size="lg">
+            </button>
+            <button className="px-6 py-3 border-2 border-slate-200 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-all">
               Learn More
-            </Button>
+            </button>
           </div>
         </div>
       </section>
       
-      {/* Features Section */}
       <section className="py-16 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">
@@ -592,17 +440,15 @@ export default function Home() {
           
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { icon: '⚡', title: 'Lightning Fast', desc: 'Built for speed and performance' },
-              { icon: '🎨', title: 'Beautiful Design', desc: 'Modern UI with Tailwind CSS' },
-              { icon: '🔧', title: 'Easy to Customize', desc: 'Components you can modify' },
+              { icon: '⚡', title: 'Lightning Fast', desc: 'Built for speed' },
+              { icon: '🎨', title: 'Beautiful Design', desc: 'Modern UI' },
+              { icon: '🔧', title: 'Easy to Customize', desc: 'Flexible components' },
             ].map((feature, i) => (
-              <Card key={i} className="hover:shadow-lg transition-shadow">
-                <CardContent className="py-8 text-center">
-                  <div className="text-4xl mb-4">{feature.icon}</div>
-                  <h3 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h3>
-                  <p className="text-slate-600">{feature.desc}</p>
-                </CardContent>
-              </Card>
+              <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-lg transition-shadow">
+                <div className="text-4xl mb-4">{feature.icon}</div>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h3>
+                <p className="text-slate-600">{feature.desc}</p>
+              </div>
             ))}
           </div>
         </div>
@@ -610,14 +456,8 @@ export default function Home() {
     </div>
   );
 }
-`,
-    },
-    {
-      path: 'src/pages/About.tsx',
-      language: 'tsx',
-      content: `import { Card, CardContent } from '../components/ui/Card';
 
-export default function About() {
+function AboutPage() {
   return (
     <div className="py-16 px-4">
       <div className="max-w-3xl mx-auto">
@@ -626,22 +466,21 @@ export default function About() {
           Learn more about our mission and values.
         </p>
         
-        <Card>
-          <CardContent className="prose prose-slate max-w-none">
-            <p>
-              We're building tools that help developers create beautiful,
-              functional applications faster than ever before.
-            </p>
-            <p>
-              Our mission is to democratize software development and make it
-              accessible to everyone.
-            </p>
-          </CardContent>
-        </Card>
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <p className="text-slate-700 mb-4">
+            We're building tools that help developers create beautiful,
+            functional applications faster than ever before.
+          </p>
+          <p className="text-slate-700">
+            Our mission is to democratize software development.
+          </p>
+        </div>
       </div>
     </div>
   );
 }
+
+export default App;
 `,
     },
     {
@@ -665,10 +504,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       language: 'css',
       content: `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 * {
   margin: 0;
   padding: 0;
@@ -678,7 +513,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -696,17 +530,6 @@ body {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#8b5cf6',
-            }
-          }
-        }
-      }
-    </script>
   </head>
   <body>
     <div id="root"></div>

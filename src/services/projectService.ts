@@ -1,9 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Project, ProjectFile, ConversationMessage } from '@/types/projectTypes';
+import { Project, ProjectFile, ConversationMessage, FileOperation } from '@/types/projectTypes';
 
-// Note: TypeScript errors about table names are expected until the database
-// schema is applied and types are regenerated with `supabase gen types`.
-// The runtime code will work correctly once tables exist.
+// Note: This file uses type assertions (as any) because the Supabase types
+// haven't been generated yet. Run `supabase gen types typescript` after
+// applying the database migration to get proper types.
 
 // Database types (matching Supabase schema)
 interface DbProject {
@@ -33,42 +33,49 @@ interface DbConversation {
     role: 'user' | 'assistant';
     content: string;
     thought: string | null;
-    file_operations: any | null;
+    file_operations: FileOperation[] | null;
     created_at: string;
 }
 
+// Type-safe database client wrapper
+const db = {
+    projects: () => (supabase as any).from('projects'),
+    project_files: () => (supabase as any).from('project_files'),
+    conversations: () => (supabase as any).from('conversations'),
+};
+
 // Convert DB project to app format
-function dbToProject(db: DbProject): Project {
+function dbToProject(dbData: DbProject): Project {
     return {
-        id: db.id,
-        name: db.name,
-        description: db.description || undefined,
-        createdAt: new Date(db.created_at),
-        updatedAt: new Date(db.updated_at),
-        userId: db.user_id || undefined,
+        id: dbData.id,
+        name: dbData.name,
+        description: dbData.description || undefined,
+        createdAt: new Date(dbData.created_at),
+        updatedAt: new Date(dbData.updated_at),
+        userId: dbData.user_id || undefined,
     };
 }
 
 // Convert DB file to app format
-function dbToProjectFile(db: DbProjectFile): ProjectFile {
+function dbToProjectFile(dbData: DbProjectFile): ProjectFile {
     return {
-        id: db.id,
-        path: db.path,
-        content: db.content,
-        language: db.language as ProjectFile['language'],
-        isEntryPoint: db.is_entry_point,
+        id: dbData.id,
+        path: dbData.path,
+        content: dbData.content,
+        language: dbData.language as ProjectFile['language'],
+        isEntryPoint: dbData.is_entry_point,
     };
 }
 
 // Convert DB conversation to app format
-function dbToConversation(db: DbConversation): ConversationMessage {
+function dbToConversation(dbData: DbConversation): ConversationMessage {
     return {
-        id: db.id,
-        role: db.role,
-        content: db.content,
-        thought: db.thought || undefined,
-        fileOperations: db.file_operations || undefined,
-        timestamp: new Date(db.created_at),
+        id: dbData.id,
+        role: dbData.role,
+        content: dbData.content,
+        thought: dbData.thought || undefined,
+        fileOperations: dbData.file_operations || undefined,
+        timestamp: new Date(dbData.created_at),
     };
 }
 
@@ -82,8 +89,7 @@ export class ProjectService {
         const { data: { user } } = await supabase.auth.getUser();
 
         // Insert project
-        const { data: projectData, error: projectError } = await supabase
-            .from('projects')
+        const { data: projectData, error: projectError } = await db.projects()
             .insert({
                 name,
                 description,
@@ -98,7 +104,7 @@ export class ProjectService {
         }
 
         // Insert files
-        const filesToInsert = files.map(file => ({
+        const fileInserts = files.map(file => ({
             project_id: projectData.id,
             path: file.path,
             content: file.content,
@@ -106,15 +112,14 @@ export class ProjectService {
             is_entry_point: file.isEntryPoint || false,
         }));
 
-        const { data: filesData, error: filesError } = await supabase
-            .from('project_files')
-            .insert(filesToInsert)
+        const { data: filesData, error: filesError } = await db.project_files()
+            .insert(fileInserts)
             .select();
 
         if (filesError) {
             console.error('Error creating files:', filesError);
             // Rollback project
-            await supabase.from('projects').delete().eq('id', projectData.id);
+            await db.projects().delete().eq('id', projectData.id);
             return null;
         }
 
@@ -124,69 +129,57 @@ export class ProjectService {
         };
     }
 
-    // Load a project by ID
-    static async loadProject(projectId: string): Promise<{
+    // Get a project by ID with all files
+    static async getProject(projectId: string): Promise<{
         project: Project;
         files: ProjectFile[];
         conversations: ConversationMessage[];
     } | null> {
-        // Fetch project
-        const { data: projectData, error: projectError } = await supabase
-            .from('projects')
+        const { data: projectData, error: projectError } = await db.projects()
             .select('*')
             .eq('id', projectId)
             .single();
 
         if (projectError || !projectData) {
-            console.error('Error loading project:', projectError);
+            console.error('Error fetching project:', projectError);
             return null;
         }
 
-        // Fetch files
-        const { data: filesData, error: filesError } = await supabase
-            .from('project_files')
+        const { data: filesData } = await db.project_files()
             .select('*')
             .eq('project_id', projectId)
             .order('path');
 
-        if (filesError) {
-            console.error('Error loading files:', filesError);
-            return null;
-        }
-
-        // Fetch conversations
-        const { data: conversationsData, error: conversationsError } = await supabase
-            .from('conversations')
+        const { data: conversationsData } = await db.conversations()
             .select('*')
             .eq('project_id', projectId)
             .order('created_at');
 
-        if (conversationsError) {
-            console.error('Error loading conversations:', conversationsError);
-            // Continue without conversations
-        }
-
         return {
             project: dbToProject(projectData as DbProject),
-            files: (filesData as DbProjectFile[]).map(dbToProjectFile),
-            conversations: (conversationsData as DbConversation[] || []).map(dbToConversation),
+            files: ((filesData || []) as DbProjectFile[]).map(dbToProjectFile),
+            conversations: ((conversationsData || []) as DbConversation[]).map(dbToConversation),
         };
     }
 
-    // Save project files (update existing or insert new)
-    static async saveProjectFiles(
+    // Save project (update files)
+    static async saveProject(
         projectId: string,
         files: ProjectFile[]
     ): Promise<boolean> {
         // Update project timestamp
-        await supabase
-            .from('projects')
+        const { error: projectError } = await db.projects()
             .update({ updated_at: new Date().toISOString() })
             .eq('id', projectId);
 
+        if (projectError) {
+            console.error('Error updating project:', projectError);
+            return false;
+        }
+
         // Upsert files
-        const filesToUpsert = files.map(file => ({
-            id: file.id,
+        const fileUpserts = files.map(file => ({
+            id: file.id || crypto.randomUUID(),
             project_id: projectId,
             path: file.path,
             content: file.content,
@@ -194,86 +187,77 @@ export class ProjectService {
             is_entry_point: file.isEntryPoint || false,
         }));
 
-        const { error } = await supabase
-            .from('project_files')
-            .upsert(filesToUpsert, { onConflict: 'project_id,path' });
+        const { error: filesError } = await db.project_files()
+            .upsert(fileUpserts, { onConflict: 'id' });
 
-        if (error) {
-            console.error('Error saving files:', error);
+        if (filesError) {
+            console.error('Error saving files:', filesError);
             return false;
+        }
+
+        // Delete files that no longer exist
+        const fileIds = files.map(f => f.id).filter(Boolean);
+        if (fileIds.length > 0) {
+            await db.project_files()
+                .delete()
+                .eq('project_id', projectId)
+                .not('id', 'in', `(${fileIds.join(',')})`);
         }
 
         return true;
     }
 
-    // Delete a file from the project
-    static async deleteProjectFile(projectId: string, path: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('project_files')
-            .delete()
-            .eq('project_id', projectId)
-            .eq('path', path);
-
-        if (error) {
-            console.error('Error deleting file:', error);
-            return false;
-        }
-
-        return true;
-    }
-
-    // Save a conversation message
-    static async saveConversation(
+    // Add a conversation message
+    static async addConversation(
         projectId: string,
-        message: Omit<ConversationMessage, 'id' | 'timestamp'>
+        role: 'user' | 'assistant',
+        content: string,
+        thought?: string,
+        fileOperations?: FileOperation[]
     ): Promise<ConversationMessage | null> {
-        const { data, error } = await supabase
-            .from('conversations')
+        const { data, error } = await db.conversations()
             .insert({
                 project_id: projectId,
-                role: message.role,
-                content: message.content,
-                thought: message.thought || null,
-                file_operations: message.fileOperations || null,
+                role,
+                content,
+                thought: thought || null,
+                file_operations: fileOperations || null,
             })
             .select()
             .single();
 
-        if (error) {
-            console.error('Error saving conversation:', error);
+        if (error || !data) {
+            console.error('Error adding conversation:', error);
             return null;
         }
 
         return dbToConversation(data as DbConversation);
     }
 
-    // List all projects for the current user
-    static async listProjects(): Promise<Project[]> {
+    // Get user's projects
+    static async getUserProjects(): Promise<Project[]> {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-            // Return empty for anonymous users
             return [];
         }
 
-        const { data, error } = await supabase
-            .from('projects')
+        const { data, error } = await db.projects()
             .select('*')
             .eq('user_id', user.id)
             .order('updated_at', { ascending: false });
 
         if (error) {
-            console.error('Error listing projects:', error);
+            console.error('Error fetching projects:', error);
             return [];
         }
 
-        return (data as DbProject[]).map(dbToProject);
+        return ((data || []) as DbProject[]).map(dbToProject);
     }
 
     // Delete a project
     static async deleteProject(projectId: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('projects')
+        const { error } = await db.projects()
             .delete()
             .eq('id', projectId);
 
@@ -287,8 +271,7 @@ export class ProjectService {
 
     // Rename a project
     static async renameProject(projectId: string, name: string): Promise<boolean> {
-        const { error } = await supabase
-            .from('projects')
+        const { error } = await db.projects()
             .update({ name })
             .eq('id', projectId);
 
@@ -298,17 +281,5 @@ export class ProjectService {
         }
 
         return true;
-    }
-
-    // Check if user is authenticated
-    static async isAuthenticated(): Promise<boolean> {
-        const { data: { user } } = await supabase.auth.getUser();
-        return !!user;
-    }
-
-    // Get current user
-    static async getCurrentUser() {
-        const { data: { user } } = await supabase.auth.getUser();
-        return user;
     }
 }
