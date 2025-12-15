@@ -32,6 +32,8 @@ interface Attachment {
     file: File;
 }
 
+const MAX_AUTO_RETRIES = 2;
+
 export function IDEChatPanel() {
     const {
         project,
@@ -52,6 +54,7 @@ export function IDEChatPanel() {
     const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
     const [showDebug, setShowDebug] = useState(false);
     const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
+    const [autoRetryCount, setAutoRetryCount] = useState(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,6 +75,21 @@ export function IDEChatPanel() {
             textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
         }
     }, [input]);
+
+    // Auto error recovery loop
+    useEffect(() => {
+        if (sandpackError && !isGenerating && autoRetryCount < MAX_AUTO_RETRIES) {
+            const timer = setTimeout(() => {
+                setAutoRetryCount(prev => prev + 1);
+                handleFixError();
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+        // Reset retry count when error is cleared
+        if (!sandpackError) {
+            setAutoRetryCount(0);
+        }
+    }, [sandpackError, isGenerating]);
 
     const handleSend = useCallback(async () => {
         if (!input.trim() || isGenerating) return;
@@ -430,7 +448,7 @@ export function IDEChatPanel() {
                             </div>
                         )}
 
-                        {/* Error Fix Button */}
+                        {/* Error Fix Button with Auto-Retry */}
                         {sandpackError && !isGenerating && (
                             <div className="animate-fade-in space-y-2">
                                 <div className="flex items-start gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl">
@@ -442,13 +460,25 @@ export function IDEChatPanel() {
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={handleFixError}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white rounded-xl transition-all shadow-lg text-sm font-medium"
-                                >
-                                    <Wrench className="w-4 h-4" />
-                                    Try to Fix
-                                </button>
+                                {autoRetryCount < MAX_AUTO_RETRIES ? (
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 border border-orange-500/30 rounded-xl">
+                                        <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
+                                        <span className="text-sm text-orange-300">
+                                            Auto-fixing... (attempt {autoRetryCount + 1}/{MAX_AUTO_RETRIES})
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            setAutoRetryCount(0);
+                                            handleFixError();
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-400 hover:to-red-400 text-white rounded-xl transition-all shadow-lg text-sm font-medium"
+                                    >
+                                        <Wrench className="w-4 h-4" />
+                                        Try to Fix Again
+                                    </button>
+                                )}
                             </div>
                         )}
                         <div ref={messagesEndRef} />
