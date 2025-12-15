@@ -184,6 +184,43 @@ serve(async (req) => {
 - Tailwind CSS (ALL classes available)
 - useState/useEffect for state
 
+=== AVAILABLE LIBRARIES (USE THESE!) ===
+
+ICONS (lucide-react):
+import { Plus, Trash, Edit, Search, Menu, X, Check, ChevronRight, User, Settings } from 'lucide-react';
+<Plus className="w-5 h-5" />
+
+CHARTS (recharts):
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie } from 'recharts';
+
+DATES (date-fns):
+import { format, parseISO, addDays, differenceInDays, isAfter, isBefore } from 'date-fns';
+format(new Date(), 'PPP') // "April 29, 2024"
+
+ANIMATION (framer-motion):
+import { motion, AnimatePresence } from 'framer-motion';
+<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+
+=== TYPESCRIPT RULES (REQUIRED) ===
+
+1. Define interfaces for ALL data shapes:
+   interface User { id: string; name: string; email: string; }
+   interface Todo { id: string; text: string; completed: boolean; }
+
+2. Type ALL component props:
+   interface CardProps { title: string; children: React.ReactNode; }
+   function Card({ title, children }: CardProps) { ... }
+
+3. Type ALL state:
+   const [users, setUsers] = useState<User[]>([]);
+   const [count, setCount] = useState<number>(0);
+   const [isOpen, setIsOpen] = useState<boolean>(false);
+
+4. Use proper event types:
+   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {}
+   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {}
+   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {}
+
 === IMPORT RULES (CRITICAL) ===
 - NEVER use @/ import aliases (like @/components/...)
 - ALWAYS use relative imports (like ./components/... or ../utils/...)
@@ -226,8 +263,9 @@ Return JSON with "files" array (MULTIPLE files when needed):
 
       contextMessage += `\n=== USER REQUEST ===\n${prompt}\n\n=== REMEMBER: MODIFY the existing code above, don't replace it! ===`;
 
-      // FEW-SHOT: Multi-file example to teach model to create separate components
-      const fewShotExample = [
+      // FEW-SHOT EXAMPLES: 5 diverse examples to teach different patterns
+      const fewShotExamples = [
+        // Example 1: Basic Counter Component
         {
           role: "user",
           parts: [{ text: "Create a counter with + and - buttons" }]
@@ -243,8 +281,12 @@ Return JSON with "files" array (MULTIPLE files when needed):
                   path: "src/components/Counter.tsx",
                   content: `import { useState } from 'react';
 
-export function Counter() {
-  const [count, setCount] = useState(0);
+interface CounterProps {
+  initialValue?: number;
+}
+
+export function Counter({ initialValue = 0 }: CounterProps) {
+  const [count, setCount] = useState<number>(initialValue);
   
   return (
     <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10">
@@ -287,11 +329,457 @@ export default App;`,
               ]
             })
           }]
+        },
+        // Example 2: Page with State-Based Navigation
+        {
+          role: "user",
+          parts: [{ text: "Create an about page with company info" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- AboutPage (new page in src/pages/)\n- App (modify to add state-based routing)\n\n## 2. STATE\n- currentPage: string in App.tsx for navigation\n\n## 3. FUNCTIONS\n- setCurrentPage handler for nav\n\n## 4. STYLING\n- Glassmorphic cards, gradient text, nav bar\n\n## 5. FILE PLAN\n- CREATE src/pages/AboutPage.tsx\n- MODIFY src/App.tsx with navigation",
+              message: "Created an About page with state-based navigation",
+              files: [
+                {
+                  path: "src/pages/AboutPage.tsx",
+                  content: `import { ChevronRight } from 'lucide-react';
+
+interface AboutPageProps {
+  onNavigate: (page: string) => void;
+}
+
+export function AboutPage({ onNavigate }: AboutPageProps) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+      <div className="max-w-4xl mx-auto">
+        <button 
+          onClick={() => onNavigate('home')}
+          className="flex items-center gap-2 text-violet-400 hover:text-violet-300 mb-8 transition-colors"
+        >
+          <ChevronRight className="w-4 h-4 rotate-180" />
+          Back to Home
+        </button>
+        
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent mb-6">
+            About Us
+          </h1>
+          <p className="text-slate-300 text-lg leading-relaxed mb-6">
+            We are a forward-thinking company dedicated to building innovative solutions 
+            that make a difference. Our team of experts works tirelessly to deliver 
+            exceptional products and services.
+          </p>
+          <div className="grid md:grid-cols-3 gap-6 mt-8">
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 className="text-xl font-semibold text-white mb-2">Our Mission</h3>
+              <p className="text-slate-400">To innovate and inspire through technology.</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 className="text-xl font-semibold text-white mb-2">Our Vision</h3>
+              <p className="text-slate-400">A world connected through elegant solutions.</p>
+            </div>
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+              <h3 className="text-xl font-semibold text-white mb-2">Our Values</h3>
+              <p className="text-slate-400">Integrity, innovation, and excellence.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { useState } from 'react';
+import { AboutPage } from './pages/AboutPage';
+
+function App() {
+  const [currentPage, setCurrentPage] = useState<string>('home');
+  
+  if (currentPage === 'about') {
+    return <AboutPage onNavigate={setCurrentPage} />;
+  }
+  
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-4">
+      <h1 className="text-4xl font-bold text-white mb-8">Welcome Home</h1>
+      <button 
+        onClick={() => setCurrentPage('about')}
+        className="px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white rounded-xl transition-all shadow-lg"
+      >
+        Learn About Us
+      </button>
+    </div>
+  );
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
+        },
+        // Example 3: Custom Hook
+        {
+          role: "user",
+          parts: [{ text: "Create a useLocalStorage hook" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- useLocalStorage hook (new in src/hooks/)\n- StorageDemo component to showcase usage\n- App (modify to use demo)\n\n## 2. STATE\n- Generic T value persisted to localStorage\n\n## 3. FUNCTIONS\n- setValue with localStorage sync\n- useEffect for initial load\n\n## 4. STYLING\n- Demo with input and display\n\n## 5. FILE PLAN\n- CREATE src/hooks/useLocalStorage.ts\n- CREATE src/components/StorageDemo.tsx\n- MODIFY src/App.tsx",
+              message: "Created useLocalStorage hook with demo component",
+              files: [
+                {
+                  path: "src/hooks/useLocalStorage.ts",
+                  content: `import { useState, useEffect } from 'react';
+
+export function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      console.error('Error reading localStorage:', error);
+      return initialValue;
+    }
+  });
+
+  const setValue = (value: T) => {
+    try {
+      setStoredValue(value);
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error('Error writing to localStorage:', error);
+    }
+  };
+
+  return [storedValue, setValue];
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/components/StorageDemo.tsx",
+                  content: `import { useLocalStorage } from '../hooks/useLocalStorage';
+
+interface UserPrefs {
+  theme: string;
+  name: string;
+}
+
+export function StorageDemo() {
+  const [prefs, setPrefs] = useLocalStorage<UserPrefs>('user-prefs', { theme: 'dark', name: '' });
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPrefs({ ...prefs, name: e.target.value });
+  };
+
+  return (
+    <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10 max-w-md">
+      <h2 className="text-2xl font-bold text-white mb-6">LocalStorage Demo</h2>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-slate-300 mb-2">Your Name (persisted)</label>
+          <input
+            type="text"
+            value={prefs.name}
+            onChange={handleNameChange}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+            placeholder="Enter your name..."
+          />
+        </div>
+        <p className="text-slate-400 text-sm">
+          Refresh the page - your name will persist!
+        </p>
+      </div>
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { StorageDemo } from './components/StorageDemo';
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <StorageDemo />
+    </div>
+  );
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
+        },
+        // Example 4: Data Fetching with Loading/Error States
+        {
+          role: "user",
+          parts: [{ text: "Create a user list that fetches from an API" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- UserList component with fetch logic\n- App (modify to render UserList)\n\n## 2. STATE\n- users: User[] for data\n- loading: boolean for loading state\n- error: string | null for errors\n\n## 3. FUNCTIONS\n- useEffect with fetch\n- Error/loading handling\n\n## 4. STYLING\n- User cards with avatar, loading spinner\n\n## 5. FILE PLAN\n- CREATE src/components/UserList.tsx\n- MODIFY src/App.tsx",
+              message: "Created UserList with loading and error states",
+              files: [
+                {
+                  path: "src/components/UserList.tsx",
+                  content: `import { useState, useEffect } from 'react';
+import { User, AlertCircle } from 'lucide-react';
+
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  company: { name: string };
+}
+
+export function UserList() {
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('https://jsonplaceholder.typicode.com/users');
+        if (!response.ok) throw new Error('Failed to fetch users');
+        const data: UserData[] = await response.json();
+        setUsers(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-12 h-12 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-6 flex items-center gap-4">
+        <AlertCircle className="w-6 h-6 text-red-400" />
+        <p className="text-red-300">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-bold text-white mb-6">Users</h2>
+      {users.map((user) => (
+        <div key={user.id} className="bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-white/10 flex items-center gap-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-500 rounded-full flex items-center justify-center">
+            <User className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h3 className="text-white font-semibold">{user.name}</h3>
+            <p className="text-slate-400 text-sm">{user.email}</p>
+            <p className="text-slate-500 text-xs">{user.company.name}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { UserList } from './components/UserList';
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+      <div className="max-w-2xl mx-auto">
+        <UserList />
+      </div>
+    </div>
+  );
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
+        },
+        // Example 5: Form with Validation
+        {
+          role: "user",
+          parts: [{ text: "Create a contact form with validation" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- ContactForm with validation\n- App (modify to render form)\n\n## 2. STATE\n- formData: object with name, email, message\n- errors: object with field errors\n- submitted: boolean for success state\n\n## 3. FUNCTIONS\n- handleChange for inputs\n- validate function\n- handleSubmit with validation\n\n## 4. STYLING\n- Styled inputs, error messages, submit button\n\n## 5. FILE PLAN\n- CREATE src/components/ContactForm.tsx\n- MODIFY src/App.tsx",
+              message: "Created ContactForm with validation",
+              files: [
+                {
+                  path: "src/components/ContactForm.tsx",
+                  content: `import { useState } from 'react';
+import { Send, Check } from 'lucide-react';
+
+interface FormData {
+  name: string;
+  email: string;
+  message: string;
+}
+
+interface FormErrors {
+  name?: string;
+  email?: string;
+  message?: string;
+}
+
+export function ContactForm() {
+  const [formData, setFormData] = useState<FormData>({ name: '', email: '', message: '' });
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitted, setSubmitted] = useState<boolean>(false);
+
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {};
+    if (!formData.name.trim()) newErrors.name = 'Name is required';
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Invalid email format';
+    }
+    if (!formData.message.trim()) newErrors.message = 'Message is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (validate()) {
+      setSubmitted(true);
+      // Handle form submission here
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name as keyof FormErrors]) {
+      setErrors(prev => ({ ...prev, [name]: undefined }));
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-8 text-center">
+        <Check className="w-16 h-16 text-emerald-400 mx-auto mb-4" />
+        <h3 className="text-xl font-bold text-white mb-2">Thank You!</h3>
+        <p className="text-slate-300">Your message has been sent successfully.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10">
+      <h2 className="text-2xl font-bold text-white mb-6">Contact Us</h2>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-slate-300 mb-2">Name</label>
+          <input
+            type="text"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className={\`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 \${errors.name ? 'border-red-500' : 'border-white/10'}\`}
+            placeholder="Your name"
+          />
+          {errors.name && <p className="text-red-400 text-sm mt-1">{errors.name}</p>}
+        </div>
+
+        <div>
+          <label className="block text-slate-300 mb-2">Email</label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            className={\`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 \${errors.email ? 'border-red-500' : 'border-white/10'}\`}
+            placeholder="your@email.com"
+          />
+          {errors.email && <p className="text-red-400 text-sm mt-1">{errors.email}</p>}
+        </div>
+
+        <div>
+          <label className="block text-slate-300 mb-2">Message</label>
+          <textarea
+            name="message"
+            value={formData.message}
+            onChange={handleChange}
+            rows={4}
+            className={\`w-full px-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none \${errors.message ? 'border-red-500' : 'border-white/10'}\`}
+            placeholder="Your message..."
+          />
+          {errors.message && <p className="text-red-400 text-sm mt-1">{errors.message}</p>}
+        </div>
+
+        <button
+          type="submit"
+          className="w-full px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+        >
+          <Send className="w-5 h-5" />
+          Send Message
+        </button>
+      </div>
+    </form>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { ContactForm } from './components/ContactForm';
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <ContactForm />
+      </div>
+    </div>
+  );
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
         }
       ];
 
       messages = [
-        ...fewShotExample,
+        ...fewShotExamples,
         ...conversationHistory,
         {
           role: "user",
@@ -534,9 +1022,33 @@ export default App;
           fixedContent = fixedContent.replace(/\bautocomplete=/gi, 'autoComplete=');
           fixedContent = fixedContent.replace(/\bautofocus\b/gi, 'autoFocus');
 
-          // Ensure file exports default
+          // Ensure file exports default - but detect the correct component name
           if (!fixedContent.includes('export default')) {
-            fixedContent += '\n\nexport default App;\n';
+            // Try to extract the component name from the file
+            const functionMatch = fixedContent.match(/(?:export\s+)?function\s+([A-Z][a-zA-Z0-9]*)\s*\(/);
+            const constMatch = fixedContent.match(/(?:export\s+)?const\s+([A-Z][a-zA-Z0-9]*)\s*[=:]/);
+
+            // Get component name from file path as fallback
+            const pathParts = file.path.split('/');
+            const fileName = pathParts[pathParts.length - 1];
+            const fileBaseName = fileName.replace(/\.(tsx|jsx|ts|js)$/, '');
+
+            // Priority: function name > const name > file name > 'App' only for App.tsx
+            let componentName: string | null = functionMatch?.[1] || constMatch?.[1] || fileBaseName;
+
+            // Only use 'App' as fallback if this is actually App.tsx
+            if (!componentName || componentName.toLowerCase() === 'index') {
+              if (file.path.includes('App.tsx') || file.path.includes('App.jsx')) {
+                componentName = 'App';
+              } else {
+                // Skip adding export if we can't determine the name and it's not App.tsx
+                componentName = null;
+              }
+            }
+
+            if (componentName) {
+              fixedContent += `\n\nexport default ${componentName};\n`;
+            }
           }
 
           debugLog.push(`[DEBUG] Fixed ${file.path}: ${originalLength} -> ${fixedContent.length} chars`);
