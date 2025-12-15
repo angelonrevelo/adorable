@@ -27,75 +27,30 @@ OUTPUT FORMAT - Respond ONLY with valid JSON:
   "title": "Short title (2-4 words)"
 }`;
 
-// Adorable-style multi-file React prompt with chain-of-thought
-const multiFileSystemPrompt = `You are an expert full-stack React developer and UI/UX designer.
-You generate COMPLETE, PRODUCTION-QUALITY, BEAUTIFULLY STYLED multi-file React applications.
+// React multi-file generation prompt - NO HTML references
+const multiFileSystemPrompt = `You are a React developer. Generate React TypeScript components.
 
-=== CRITICAL: OUTPUT FORMAT ===
-
-You MUST respond with this EXACT JSON structure. Do NOT use the legacy HTML format.
-Your response MUST include a "files" array with React components.
+REQUIRED OUTPUT FORMAT (you MUST use this exact JSON structure):
 
 {
-  "thought": "Brief analysis of requirements and design decisions",
-  "message": "Description of what was created",
+  "thought": "your brief analysis",
+  "message": "what you built",
   "files": [
     {
       "path": "src/App.tsx",
-      "content": "// Complete React component code",
+      "content": "import { useState } from 'react';\\n\\nfunction App() {\\n  return <div>content</div>;\\n}\\n\\nexport default App;",
       "action": "modify"
     }
   ]
 }
 
-=== TECH STACK ===
-- React 18 with TypeScript
-- Tailwind CSS classes for ALL styling
-- useState/useEffect for state management
-- Lucide React icons (import from 'lucide-react')
-
-=== DESIGN SYSTEM ===
-
-Use a MODERN, PREMIUM design:
-- Background: slate-50, white, or dark mode with slate-900
-- Cards: white with subtle shadows (shadow-lg, rounded-xl)
-- Accent colors: violet-500, purple-600, indigo-500
-- Generous spacing: p-4, p-6, gap-4
-- Smooth transitions and hover effects
-
-=== COMPONENT PATTERNS ===
-
-For a simple app, create at minimum:
-
-1. src/App.tsx - Main app component with state and logic
-2. Additional components as needed in src/components/
-
-BUTTON EXAMPLE:
-\`\`\`tsx
-<button className="px-6 py-3 bg-violet-500 text-white font-medium rounded-xl shadow-lg hover:bg-violet-600 transition-all">
-  Click Me
-</button>
-\`\`\`
-
-CARD EXAMPLE:
-\`\`\`tsx
-<div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-100">
-  Content here
-</div>
-\`\`\`
-
-=== CRITICAL RULES ===
-
-1. ALWAYS respond with the "files" array format, NEVER with "html" field
-2. All logic must be in React components with useState/useEffect
-3. Use Tailwind classes for ALL styling
-4. Every component must be fully functional, not skeleton code
-5. Use self-closing JSX tags: <img />, <br />, <input />
-6. Use className, not class
-7. Include proper TypeScript types
-8. Make the UI look PREMIUM with animations, shadows, and proper spacing
-9. For games: implement full game logic with requestAnimationFrame or useEffect
-10. DO NOT use react-router-dom - use useState for navigation`;
+RULES:
+- Output MUST be a JSON object with "files" array
+- Each file MUST have path, content, and action
+- Content MUST be valid React TypeScript
+- Use Tailwind CSS classes for styling
+- Use useState/useEffect for state
+- Make UI premium: rounded-xl, shadow-lg, transitions`;
 
 
 
@@ -114,7 +69,7 @@ serve(async (req) => {
 
     console.log("Received request:", { type, promptLength: prompt?.length, historyLength: history?.length });
 
-    const model = "gemini-2.5-pro";
+    const model = "gemini-2.5-flash-preview-05-20";
 
     let messages;
     let systemInstruction;
@@ -191,20 +146,20 @@ Generate a COMPLETE React TypeScript component. Use Tailwind CSS classes for sty
 
     console.log("Calling Gemini API with model:", model);
 
-    // Define schema for multi-file generation
+    // Define schema for multi-file generation - Gemini uses uppercase TYPE values
     const multiFileSchema = {
-      type: "object",
+      type: "OBJECT",
       properties: {
-        thought: { type: "string", description: "Brief analysis of requirements" },
-        message: { type: "string", description: "Description of what was created" },
+        thought: { type: "STRING", description: "Brief analysis of requirements" },
+        message: { type: "STRING", description: "Description of what was created" },
         files: {
-          type: "array",
+          type: "ARRAY",
           items: {
-            type: "object",
+            type: "OBJECT",
             properties: {
-              path: { type: "string", description: "File path like src/App.tsx" },
-              content: { type: "string", description: "Complete file content" },
-              action: { type: "string", enum: ["create", "modify", "delete"] }
+              path: { type: "STRING", description: "File path like src/App.tsx" },
+              content: { type: "STRING", description: "Complete file content" },
+              action: { type: "STRING", enum: ["create", "modify", "delete"] }
             },
             required: ["path", "content", "action"]
           }
@@ -218,6 +173,8 @@ Generate a COMPLETE React TypeScript component. Use Tailwind CSS classes for sty
       : type === "generate-multifile"
         ? { temperature: 0.8, maxOutputTokens: 16384, responseMimeType: "application/json", responseSchema: multiFileSchema }
         : { temperature: 0.8, maxOutputTokens: 16384, responseMimeType: "application/json" };
+
+    console.log("Generation config:", JSON.stringify({ type, hasSchema: !!generationConfig.responseSchema }));
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
@@ -275,19 +232,22 @@ Generate a COMPLETE React TypeScript component. Use Tailwind CSS classes for sty
     if (parsed.html && !parsed.files) {
       console.log("Converting legacy HTML to React files format");
 
-      const html = parsed.html;
+      const html = parsed.html as string;
 
-      // Extract JavaScript from script tags
-      const scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
-      let jsLogic = '';
-      scriptMatches.forEach((script: string) => {
-        const content = script.replace(/<script[^>]*>/, '').replace(/<\/script>/, '');
-        jsLogic += content + '\n';
-      });
+      // Extract style content
+      const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+      const cssContent = styleMatch ? styleMatch[1] : '';
 
       // Extract body content
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      let bodyContent = bodyMatch ? bodyMatch[1] : html;
+      let bodyContent = bodyMatch ? bodyMatch[1] : '';
+
+      // Extract JavaScript logic
+      const scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi) || [];
+      let jsLogic = '';
+      scriptMatches.forEach((script: string) => {
+        jsLogic += script.replace(/<script[^>]*>/, '').replace(/<\/script>/, '') + '\n';
+      });
 
       // Remove script tags from body
       bodyContent = bodyContent.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
@@ -297,36 +257,31 @@ Generate a COMPLETE React TypeScript component. Use Tailwind CSS classes for sty
         .replace(/class=/g, 'className=')
         .replace(/for=/g, 'htmlFor=')
         .replace(/onclick=/gi, 'onClick=')
-        .replace(/onchange=/gi, 'onChange=');
+        .replace(/onchange=/gi, 'onChange=')
+        .replace(/tabindex=/gi, 'tabIndex=')
+        .replace(/colspan=/gi, 'colSpan=')
+        .replace(/rowspan=/gi, 'rowSpan=');
 
-      // Generate a proper React component with the title
-      const appTitle = parsed.title || 'App';
-      const reactCode = `import { useState } from 'react';
+      // Clean up body content - remove extra whitespace but preserve structure
+      bodyContent = bodyContent.trim();
+
+      // Generate a React component that renders the HTML content
+      const appTitle = parsed.title || 'Generated App';
+      const reactCode = `import { useState, useEffect } from 'react';
 
 function App() {
-  const [count, setCount] = useState(0);
+  // State for dynamic functionality
+  const [data, setData] = useState<any>({});
+  
+  useEffect(() => {
+    // Initialize any dynamic functionality here
+  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-        <h1 className="text-2xl font-bold mb-4 text-slate-800">${appTitle}</h1>
-        <div className="text-6xl font-bold mb-6 text-violet-600">{count}</div>
-        <div className="flex gap-4 justify-center">
-          <button 
-            onClick={() => setCount(c => c - 1)}
-            className="px-6 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all shadow-lg"
-          >
-            -
-          </button>
-          <button 
-            onClick={() => setCount(c => c + 1)}
-            className="px-6 py-3 bg-green-500 text-white font-bold rounded-xl hover:bg-green-600 transition-all shadow-lg"
-          >
-            +
-          </button>
-        </div>
-      </div>
-    </div>
+    <>
+      <style dangerouslySetInnerHTML={{ __html: \`${cssContent.replace(/`/g, '\\`').replace(/\${/g, '\\${')}\` }} />
+      ${bodyContent}
+    </>
   );
 }
 
@@ -334,8 +289,8 @@ export default App;
 `;
 
       parsed = {
-        thought: parsed.thought || "Generated React component from HTML",
-        message: "Created " + appTitle + " with React and Tailwind CSS",
+        thought: parsed.thought || "Converted HTML to React component",
+        message: "Created " + appTitle + " - converted from HTML to React",
         files: [
           {
             path: "src/App.tsx",
