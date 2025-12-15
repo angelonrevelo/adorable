@@ -2,23 +2,23 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 // Legacy single-file HTML prompt (for backward compatibility)
 const legacySystemPrompt = `You are an elite Creative Technologist who builds stunning, production-quality web prototypes. Every output must look like it was crafted by a top-tier design agency.
 
 DESIGN SYSTEM:
-• Background: #0a0a0f, #111118, #1a1a24
-• Primary: #8b5cf6 (violet), #a855f7 (purple)
-• Accent: #22d3ee (cyan), #10b981 (emerald)
-• Text: #ffffff, #a1a1aa (muted)
-• Use Google Fonts: Inter, Plus Jakarta Sans, JetBrains Mono
-• Use Tailwind CSS via CDN
-• Images: https://image.pollinations.ai/prompt/{description}
+- Background: #0a0a0f, #111118, #1a1a24
+- Primary: #8b5cf6 (violet), #a855f7 (purple)
+- Accent: #22d3ee (cyan), #10b981 (emerald)
+- Text: #ffffff, #a1a1aa (muted)
+- Use Google Fonts: Inter, Plus Jakarta Sans, JetBrains Mono
+- Use Tailwind CSS via CDN
+- Images: https://image.pollinations.ai/prompt/{description}
 
 OUTPUT FORMAT - Respond ONLY with valid JSON:
 {
@@ -39,10 +39,10 @@ When given a prompt, you will:
 3. GENERATE multiple coordinated files with proper imports
 
 === TECH STACK ===
-• React 18 with TypeScript
-• Tailwind CSS (via CDN in index.html)
-• React Router for multi-page apps
-• Lucide React icons (import from 'lucide-react')
+- React 18 with TypeScript
+- Tailwind CSS (via CDN in index.html)
+- React Router for multi-page apps
+- Lucide React icons (import from 'lucide-react')
 
 === DESIGN SYSTEM ===
 
@@ -136,9 +136,8 @@ Your response MUST be valid JSON with this exact structure:
 9. For complex apps, create reusable components in components/ui/
 10. NEVER generate skeleton code - every function must work`;
 
-
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -146,37 +145,42 @@ serve(async (req) => {
     const { prompt, history, type, projectFiles } = await req.json();
 
     if (!GEMINI_API_KEY) {
-      console.error('GEMINI_API_KEY is not configured');
-      throw new Error('GEMINI_API_KEY is not configured');
+      console.error("GEMINI_API_KEY is not configured");
+      throw new Error("GEMINI_API_KEY is not configured");
     }
 
-    console.log('Received request:', { type, promptLength: prompt?.length, historyLength: history?.length });
+    console.log("Received request:", { type, promptLength: prompt?.length, historyLength: history?.length });
 
-    const model = 'gemini-2.0-flash';
+    const model = "gemini-2.0-flash";
 
     let messages;
     let systemInstruction;
 
-    if (type === 'random') {
+    if (type === "random") {
       // Random idea generation
       messages = [
         {
-          role: 'user',
-          parts: [{ text: 'Generate a creative, unexpected web app idea in one sentence. Be creative and specific. Examples: "A playable Flappy Bird clone with neon graphics", "An interactive solar system explorer", "A recipe finder with drag-and-drop ingredients". Just respond with the idea, nothing else.' }]
-        }
+          role: "user",
+          parts: [
+            {
+              text: 'Generate a creative, unexpected web app idea in one sentence. Be creative and specific. Examples: "A playable Flappy Bird clone with neon graphics", "An interactive solar system explorer", "A recipe finder with drag-and-drop ingredients". Just respond with the idea, nothing else.',
+            },
+          ],
+        },
       ];
       systemInstruction = undefined;
-    } else if (type === 'generate-multifile') {
+    } else if (type === "generate-multifile") {
       // Multi-file React generation
-      const conversationHistory = history?.map((msg: { role: string; content: string }) => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      })) || [];
+      const conversationHistory =
+        history?.map((msg: { role: string; content: string }) => ({
+          role: msg.role === "assistant" ? "model" : "user",
+          parts: [{ text: msg.content }],
+        })) || [];
 
       // Build context with existing project files
       let contextMessage = prompt;
       if (projectFiles && projectFiles.length > 0) {
-        contextMessage += '\n\nCURRENT PROJECT FILES:\n';
+        contextMessage += "\n\nCURRENT PROJECT FILES:\n";
         for (const file of projectFiles) {
           contextMessage += `\n--- ${file.path} ---\n${file.content}\n`;
         }
@@ -185,65 +189,69 @@ serve(async (req) => {
       messages = [
         ...conversationHistory,
         {
-          role: 'user',
-          parts: [{ text: contextMessage }]
-        }
+          role: "user",
+          parts: [{ text: contextMessage }],
+        },
       ];
       systemInstruction = { parts: [{ text: multiFileSystemPrompt }] };
     } else {
       // Legacy single-file HTML generation
-      const conversationHistory = history?.map((msg: { role: string; content: string }) => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      })) || [];
+      const conversationHistory =
+        history?.map((msg: { role: string; content: string }) => ({
+          role: msg.role === "assistant" ? "model" : "user",
+          parts: [{ text: msg.content }],
+        })) || [];
 
       messages = [
         ...conversationHistory,
         {
-          role: 'user',
-          parts: [{ text: prompt }]
-        }
+          role: "user",
+          parts: [{ text: prompt }],
+        },
       ];
       systemInstruction = { parts: [{ text: legacySystemPrompt }] };
     }
 
-    console.log('Calling Gemini API with model:', model);
+    console.log("Calling Gemini API with model:", model);
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: messages,
-        systemInstruction,
-        generationConfig: {
-          temperature: type === 'random' ? 1.2 : 0.8,
-          maxOutputTokens: type === 'random' ? 100 : 16384,
-          responseMimeType: type === 'random' ? 'text/plain' : 'application/json',
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      }),
-    });
+        body: JSON.stringify({
+          contents: messages,
+          systemInstruction,
+          generationConfig: {
+            temperature: type === "random" ? 1.2 : 0.8,
+            maxOutputTokens: type === "random" ? 100 : 16384,
+            responseMimeType: type === "random" ? "text/plain" : "application/json",
+          },
+        }),
+      },
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
+      console.error("Gemini API error:", response.status, errorText);
       throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('Gemini API response received');
+    console.log("Gemini API response received");
 
     const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!content) {
-      console.error('No content in Gemini response:', JSON.stringify(data));
-      throw new Error('No content in Gemini response');
+      console.error("No content in Gemini response:", JSON.stringify(data));
+      throw new Error("No content in Gemini response");
     }
 
-    if (type === 'random') {
+    if (type === "random") {
       return new Response(JSON.stringify({ idea: content.trim() }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -252,28 +260,29 @@ serve(async (req) => {
     try {
       parsed = JSON.parse(content);
     } catch (e) {
-      console.error('Failed to parse Gemini response as JSON:', content);
+      console.error("Failed to parse Gemini response as JSON:", content);
       // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsed = JSON.parse(jsonMatch[0]);
       } else {
-        throw new Error('Invalid JSON response from Gemini');
+        throw new Error("Invalid JSON response from Gemini");
       }
     }
 
     return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error) {
-    console.error('Error in generate-vibe function:', error);
-    return new Response(JSON.stringify({
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Error in generate-vibe function:", error);
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error occurred",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });
-
