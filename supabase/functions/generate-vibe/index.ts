@@ -97,7 +97,7 @@ serve(async (req) => {
 
     console.log("Received request:", { type, promptLength: prompt?.length, historyLength: history?.length });
 
-    const model = "gemini-1.5-pro-latest";
+    const model = "gemini-2.0-flash-001"; // Fast model to avoid timeout
 
     let messages;
     let systemInstruction;
@@ -144,6 +144,11 @@ serve(async (req) => {
 - React 18 with TypeScript
 - Tailwind CSS (ALL classes available)
 - useState/useEffect for state
+
+=== IMPORT RULES (CRITICAL) ===
+- NEVER use @/ import aliases (like @/components/...)
+- ALWAYS use relative imports (like ./components/... or ../utils/...)
+- The bundler does not support path aliases
 
 === DESIGN REQUIREMENTS ===
 - PREMIUM DESIGN: Use gradients, shadows, rounded corners, transitions
@@ -417,6 +422,12 @@ export default App;
         if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
           let fixedContent = file.content;
           const originalLength = fixedContent.length;
+
+          // MARKDOWN CLEANUP: Strip ```tsx, ```typescript, etc code block markers
+          fixedContent = fixedContent
+            .replace(/^```(?:tsx|typescript|jsx|ts|js|javascript)?\n?/gm, '')
+            .replace(/\n?```$/gm, '')
+            .trim();
 
           // Fix HTML comments to JSX comments
           fixedContent = fixedContent.replace(/<!--\s*([\s\S]*?)\s*-->/g, '{/* $1 */}');
