@@ -282,4 +282,26 @@ export class ProjectService {
 
         return true;
     }
+
+    // Get current authenticated user
+    static async getCurrentUser() {
+        const { data: { user } } = await supabase.auth.getUser();
+        return user;
+    }
+
+    // Check if user is authenticated
+    static async isAuthenticated(): Promise<boolean> {
+        const { data: { user } } = await supabase.auth.getUser();
+        return !!user;
+    }
+
+    // Alias for getProject (used by IDE.tsx)
+    static async loadProject(projectId: string) {
+        return this.getProject(projectId);
+    }
+
+    // Alias for saveProject (used by IDE.tsx)
+    static async saveProjectFiles(projectId: string, files: ProjectFile[]): Promise<boolean> {
+        return this.saveProject(projectId, files);
+    }
 }

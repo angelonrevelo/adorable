@@ -12,10 +12,10 @@ export async function generateVibe(
   history: HistoryMessage[],
   projectFiles?: ProjectFile[]
 ): Promise<GenerateVibeResponse> {
-  // Format project files as context if provided
+  // Format project files as context - only truncate extremely large files (>50KB)
   const filesContext = projectFiles?.map(f => ({
     path: f.path,
-    content: f.content.slice(0, 2000), // Limit content size for context
+    content: f.content.length > 50000 ? f.content.slice(0, 50000) : f.content,
   }));
 
   const { data, error } = await supabase.functions.invoke('generate-vibe', {
