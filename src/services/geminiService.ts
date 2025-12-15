@@ -24,7 +24,8 @@ export interface StreamEvent {
 export async function* generateVibeStream(
   prompt: string,
   history: HistoryMessage[],
-  projectFiles?: ProjectFile[]
+  projectFiles?: ProjectFile[],
+  context?: string // New optional context parameter
 ): AsyncGenerator<StreamEvent> {
   // Format project files as context
   const filesContext = projectFiles?.map(f => ({
@@ -50,7 +51,7 @@ export async function* generateVibeStream(
         'Authorization': `Bearer ${supabaseKey}`,
       },
       body: JSON.stringify({
-        prompt,
+        prompt: context ? `${prompt}\n\n=== CONTEXT / KNOWLEDGE ===\n${context}` : prompt, // Append context to prompt
         history: history.map(m => ({ role: m.role, content: m.content })),
         projectFiles: filesContext,
         type: 'generate-stream'
@@ -114,7 +115,8 @@ export async function* generateVibeStream(
 export async function generateVibe(
   prompt: string,
   history: HistoryMessage[],
-  projectFiles?: ProjectFile[]
+  projectFiles?: ProjectFile[],
+  context?: string // New optional context parameter
 ): Promise<GenerateVibeResponse> {
   // Format project files as context - only truncate extremely large files (>50KB)
   const filesContext = projectFiles?.map(f => ({
@@ -124,7 +126,7 @@ export async function generateVibe(
 
   const { data, error } = await supabase.functions.invoke('generate-vibe', {
     body: {
-      prompt,
+      prompt: context ? `${prompt}\n\n=== CONTEXT / KNOWLEDGE ===\n${context}` : prompt, // Append context to prompt
       history: history.map(m => ({ role: m.role, content: m.content })),
       projectFiles: filesContext,
       type: 'generate-multifile' // New type for multi-file generation
@@ -166,6 +168,7 @@ export async function generateVibe(
     response.files = data.files as FileOperation[];
     response.message = data.message || 'Generated files successfully.';
   }
+
   // Legacy single-file format - convert to multi-file
   else if (data.html) {
     response.html = data.html;

@@ -389,97 +389,69 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
 
 === COMPLETE LIBRARY REFERENCE ===
 
+=== COMPLETE LIBRARY REFERENCE ===
+
 ✅ INSTALLED & READY TO USE:
 
 UI COMPONENTS:
-- lucide-react: Icons (Plus, Trash2, Search, Menu, X, Check, ChevronRight, User, Settings, MapPin, Navigation, Building, etc.)
-  import { Plus, Trash2, Search } from 'lucide-react';
-  <Plus className="w-5 h-5" />
-  
+- lucide-react: Icons
 - @radix-ui/*: Headless UI primitives
-  Dialog, DropdownMenu, Tabs, Tooltip, Accordion, Switch, Checkbox, Select, Slider, Progress, Avatar
-  
-- class-variance-authority: Component variants
-  import { cva } from 'class-variance-authority';
-  
-- clsx + tailwind-merge: Conditional classes
-  import { clsx } from 'clsx';
+- class-variance-authority, clsx, tailwind-merge
+
+3D & GRAPHICS:
+- three, @react-three/fiber, @react-three/drei:
+  import { Canvas } from '@react-three/fiber';
+  import { OrbitControls, Sphere } from '@react-three/drei';
+  <Canvas><OrbitControls /><Sphere /></Canvas>
 
 ANIMATION:
-- framer-motion: Motion components and animations
-  import { motion, AnimatePresence } from 'framer-motion';
-  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+- framer-motion:
+  import { motion } from 'framer-motion';
 
 CHARTS:
-- recharts: Data visualization
-  import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, AreaChart, Area } from 'recharts';
+- recharts:
+  import { LineChart, BarChart, PieChart } from 'recharts';
+
+DATA & RESEARCH (INTERNET ACCESS SIMULATION):
+- axios & native fetch:
+  You have "internet access" via public APIs.
+  - Weather: https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m
+  - Crypto: https://api.coincap.io/v2/assets
+  - Jokes: https://official-joke-api.appspot.com/random_joke
+  - IP Info: https://ipapi.co/json/
+  
+  When user asks for "Research" or "Real Data":
+  1. Identify a public API (no key required preferred)
+  2. Create a React component that fetches this data using useEffect + axios/fetch
+  3. Display it beautifully
 
 DATES:
-- date-fns: Date formatting and manipulation
-  import { format, parseISO, addDays, differenceInDays, isAfter, isBefore, formatDistanceToNow } from 'date-fns';
-  format(new Date(), 'PPP') // "April 29, 2024"
+- date-fns: format, parseISO, etc.
 
-STATE MANAGEMENT:
-- zustand: Simple global state
-  import { create } from 'zustand';
-  const useStore = create((set) => ({ count: 0, inc: () => set((s) => ({ count: s.count + 1 })) }));
-
-VALIDATION:
-- zod: Schema validation
-  import { z } from 'zod';
-  const schema = z.object({ email: z.string().email(), age: z.number().min(0) });
-
-DATA FETCHING:
-- @tanstack/react-query: Server state management
-  import { useQuery, useMutation, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+STATE:
+- zustand: Global state management
 
 FORMS:
-- react-hook-form: Form handling
-  import { useForm } from 'react-hook-form';
-  const { register, handleSubmit, formState } = useForm();
+- react-hook-form + zod
 
 NOTIFICATIONS:
-- sonner: Toast notifications
-  import { toast, Toaster } from 'sonner';
-  toast('Hello!'); toast.success('Success!'); toast.error('Error!');
+- sonner
 
-DRAG & DROP:
-- @dnd-kit/core: Drag and drop
-  import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
-- @dnd-kit/sortable: Sortable lists
-  import { SortableContext, useSortable } from '@dnd-kit/sortable';
+❌ NOT INSTALLED - DO NOT USE:
 
-UTILS:
-- uuid: Unique IDs
-  import { v4 as uuidv4 } from 'uuid';
-
-❌ NOT INSTALLED - DO NOT USE (WILL CAUSE ERRORS):
-
-MAPS (use OpenStreetMap iframe instead):
-- leaflet, react-leaflet ❌
-- mapbox-gl, react-map-gl ❌
-- google-maps-react, @react-google-maps/api ❌
-
-HTTP (use native fetch instead):
-- axios ❌
-
-DATES (use date-fns instead):
-- moment ❌
-- dayjs ❌
+MAPS (do NOT import - use window.L instead, see MAPS section below):
+- import 'leaflet' ❌ (use window.L instead)
+- react-leaflet ❌
 
 STATE (use zustand or useState instead):
-- redux, @reduxjs/toolkit ❌
-- mobx ❌
-- recoil, jotai ❌
+- redux, mobx ❌
 
 STYLING (use Tailwind CSS instead):
-- styled-components ❌
-- @emotion/react, @emotion/styled ❌
+- styled-components, emotion ❌
 
 ANIMATION (use framer-motion instead):
-- gsap ❌
-- anime.js ❌
-- react-spring ❌
+- gsap, anime.js ❌
+
 
 FORMS (use react-hook-form instead):
 - formik ❌
@@ -495,9 +467,9 @@ When user asks for... → Use this:
 - "Global state" → zustand
 - "Data caching" → @tanstack/react-query
 
-=== MAPS (NO LIBRARY NEEDED!) ===
+=== MAPS (TWO OPTIONS) ===
 
-For ANY map request, use OpenStreetMap iframe embed:
+OPTION 1: Simple Static Map (OpenStreetMap iframe) - BEST FOR SIMPLE DISPLAYS
 
 <iframe
   src="https://www.openstreetmap.org/export/embed.html?bbox=120.9,14.4,121.2,14.8&layer=mapnik"
@@ -512,6 +484,72 @@ Common bbox coordinates:
 - San Francisco: bbox=-122.5,37.7,-122.3,37.85
 
 For markers, append: ?mlat={lat}&mlon={lon}
+
+OPTION 2: Interactive Map (Leaflet via CDN) - FOR MARKERS, PAN, ZOOM
+
+Leaflet is loaded globally via CDN. Access it via window.L (NOT import!).
+
+CRITICAL RULES FOR MAPS:
+1. NEVER writes \`import L from 'leaflet'\` (this package is NOT installed)
+2. NEVER writes \`import 'leaflet/dist/leaflet.css'\`
+3. ALWAYS define \`const L = (window as any).L;\` inside useEffect
+4. ALWAYS add this to your component:
+   \`\`\`tsx
+   declare global {
+     interface Window { L: any; }
+   }
+   \`\`\`
+
+Example MapComponent.tsx:
+\`\`\`tsx
+import { useEffect, useRef } from 'react';
+
+declare global {
+  interface Window { L: any; }
+}
+
+interface MapProps {
+  center?: [number, number];
+  zoom?: number;
+  markers?: Array<{ lat: number; lng: number; popup?: string }>;
+}
+
+export function MapComponent({ center = [14.5995, 120.9842], zoom = 13, markers = [] }: MapProps) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+    
+    const L = window.L;
+    if (!L) {
+      console.error('Leaflet not loaded');
+      return;
+    }
+
+    const map = L.map(mapRef.current).setView(center, zoom);
+    mapInstanceRef.current = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    markers.forEach(({ lat, lng, popup }) => {
+      const marker = L.marker([lat, lng]).addTo(map);
+      if (popup) marker.bindPopup(popup);
+    });
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  return <div ref={mapRef} className="w-full h-[400px] rounded-xl" />;
+}
+\`\`\`
 
 === IMAGES ===
 

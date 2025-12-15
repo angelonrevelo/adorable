@@ -6,8 +6,18 @@ export const reactTemplate: ProjectTemplate = {
   description: 'A minimal React + TypeScript template',
   icon: '⚛️',
   dependencies: {
-    'react': '^18.2.0',
-    'react-dom': '^18.2.0',
+    'react': '^18.3.1',
+    'react-dom': '^18.3.1',
+    'lucide-react': '^0.344.0',
+    'recharts': '^2.12.0',
+    'framer-motion': '^11.0.8',
+    'axios': '^1.6.7',
+    'three': '^0.160.0',
+    '@react-three/fiber': '^8.15.16',
+    '@react-three/drei': '^9.99.0',
+    'date-fns': '^3.3.1',
+    'clsx': '^2.1.0',
+    'tailwind-merge': '^2.2.1',
   },
   files: [
     {
@@ -181,6 +191,10 @@ body {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My App</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS for map support -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <!-- Leaflet JS for map support -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   </head>
   <body>
     <div id="root"></div>
@@ -225,8 +239,18 @@ export const blankTemplate: ProjectTemplate = {
   description: 'Start from scratch',
   icon: '📄',
   dependencies: {
-    'react': '^18.2.0',
-    'react-dom': '^18.2.0',
+    'react': '^18.3.1',
+    'react-dom': '^18.3.1',
+    'lucide-react': '^0.344.0',
+    'recharts': '^2.12.0',
+    'framer-motion': '^11.0.8',
+    'axios': '^1.6.7',
+    'three': '^0.160.0',
+    '@react-three/fiber': '^8.15.16',
+    '@react-three/drei': '^9.99.0',
+    'date-fns': '^3.3.1',
+    'clsx': '^2.1.0',
+    'tailwind-merge': '^2.2.1',
   },
   files: [
     {
@@ -317,6 +341,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My App</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS for map support -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <!-- Leaflet JS for map support -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   </head>
   <body>
     <div id="root"></div>
@@ -335,8 +363,18 @@ export const modernTemplate: ProjectTemplate = {
   description: 'Tailwind + Components',
   icon: '🚀',
   dependencies: {
-    'react': '^18.2.0',
-    'react-dom': '^18.2.0',
+    'react': '^18.3.1',
+    'react-dom': '^18.3.1',
+    'lucide-react': '^0.344.0',
+    'recharts': '^2.12.0',
+    'framer-motion': '^11.0.8',
+    'axios': '^1.6.7',
+    'three': '^0.160.0',
+    '@react-three/fiber': '^8.15.16',
+    '@react-three/drei': '^9.99.0',
+    'date-fns': '^3.3.1',
+    'clsx': '^2.1.0',
+    'tailwind-merge': '^2.2.1',
   },
   files: [
     {
@@ -532,6 +570,10 @@ body {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My App</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS for map support -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <!-- Leaflet JS for map support -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   </head>
   <body>
     <div id="root"></div>

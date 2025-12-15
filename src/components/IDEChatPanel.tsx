@@ -16,7 +16,8 @@ import {
     Bug,
     AlertTriangle,
     Wrench,
-    Brain
+    Brain,
+    BookOpen
 } from 'lucide-react';
 import { AIActivityPanel } from './AIActivityPanel';
 import { useActivityStore } from '@/stores/useActivityStore';
@@ -67,6 +68,8 @@ export function IDEChatPanel() {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
     const [showActivity, setShowActivity] = useState(false);
+    const [showKnowledge, setShowKnowledge] = useState(false);
+    const [knowledgeInput, setKnowledgeInput] = useState('');
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const [lastErrorHash, setLastErrorHash] = useState<string | null>(null);
     const [retryCooldownUntil, setRetryCooldownUntil] = useState<number>(0);
@@ -162,8 +165,24 @@ export function IDEChatPanel() {
         let resultFiles: any[] = [];
 
         try {
+            // Read attachment contents
+            let attachmentContext = '';
+            for (const att of attachments) {
+                if (att.type === 'file') {
+                    try {
+                        const text = await att.file.text();
+                        attachmentContext += `\n--- FILE: ${att.name} ---\n${text}\n`;
+                    } catch (e) {
+                        console.error('Error reading file:', att.name, e);
+                    }
+                }
+            }
+
+            // Combine with manual knowledge input
+            const fullContext = (knowledgeInput ? `MANUAL KNOWLEDGE:\n${knowledgeInput}\n` : '') + attachmentContext;
+
             // Use streaming generator
-            for await (const event of generateVibeStream(userInput, history, projectFiles)) {
+            for await (const event of generateVibeStream(userInput, history, projectFiles, fullContext)) {
                 switch (event.type) {
                     case 'thinking':
                         thinkingId = startThinking();
@@ -632,6 +651,32 @@ export function IDEChatPanel() {
                         disabled={isGenerating}
                     />
 
+                    {/* Knowledge Input Area */}
+                    {showKnowledge && (
+                        <div className="px-4 pb-3 animate-slide-in">
+                            <div className="bg-[#1a1a24] rounded-xl border border-yellow-500/20 p-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2 text-yellow-500">
+                                        <BookOpen className="w-4 h-4" />
+                                        <span className="text-xs font-medium">Training Data / Context</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setKnowledgeInput('')}
+                                        className="text-xs text-gray-500 hover:text-white"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                                <textarea
+                                    value={knowledgeInput}
+                                    onChange={(e) => setKnowledgeInput(e.target.value)}
+                                    placeholder="Paste documentation, requirements, or context here..."
+                                    className="w-full bg-[#13131a] text-xs text-gray-300 p-3 rounded-lg border border-white/5 focus:border-yellow-500/30 focus:outline-none min-h-[80px] scrollbar-hide resize-y"
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {/* Bottom Toolbar */}
                     <div className="flex items-center justify-between px-2 pb-2">
                         {/* Left side actions */}
@@ -668,6 +713,19 @@ export function IDEChatPanel() {
                                 title="Toggle AI Activity"
                             >
                                 <Brain className="w-4 h-4" />
+                            </button>
+                            {/* Knowledge toggle */}
+                            <button
+                                onClick={() => setShowKnowledge(!showKnowledge)}
+                                className={cn(
+                                    'p-2 rounded-lg transition-colors',
+                                    showKnowledge || knowledgeInput
+                                        ? 'bg-yellow-500/20 text-yellow-400'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                )}
+                                title="Add Knowledge/Context"
+                            >
+                                <BookOpen className="w-4 h-4" />
                             </button>
                         </div>
 
