@@ -27,38 +27,58 @@ OUTPUT FORMAT - Respond ONLY with valid JSON:
   "title": "Short title (2-4 words)"
 }`;
 
-// React multi-file generation prompt with FEW-SHOT EXAMPLE
-const multiFileSystemPrompt = `You are a React developer. Generate React TypeScript components.
+// Structured Chain-of-Thought (SCoT) prompt for better code generation
+const multiFileSystemPrompt = `You are an expert React developer. You MUST think step-by-step before generating code.
 
-OUTPUT FORMAT: You MUST return JSON with a "files" array containing React components.
+## STRUCTURED THINKING PROCESS (Required)
 
-=== EXAMPLE ===
+Before writing any code, analyze the request using this structure:
 
-User: "Create a counter with + and - buttons"
+### 1. COMPONENTS
+- What React components are needed?
+- What is the component hierarchy?
 
-Your response:
+### 2. STATE  
+- What useState variables are needed?
+- What are their types and initial values?
+
+### 3. FUNCTIONS
+- What event handlers are needed?
+- What logic does each function contain?
+
+### 4. STYLING
+- What Tailwind classes for layout? (flex, grid, etc.)
+- What colors, shadows, spacing to use?
+
+### 5. CODE GENERATION
+After planning, write the complete React code.
+
+## OUTPUT FORMAT
+
+You MUST respond with this exact JSON structure:
+
 {
-  "thought": "Creating a counter component with increment/decrement functionality using useState",
-  "message": "Created a beautiful counter app with + and - buttons",
+  "thought": "## 1. COMPONENTS\\n- App (main)\\n- Form component\\n\\n## 2. STATE\\n- formData: object with name, email, message\\n- isSubmitting: boolean\\n\\n## 3. FUNCTIONS\\n- handleChange: update form fields\\n- handleSubmit: validate and submit\\n\\n## 4. STYLING\\n- Dark gradient background\\n- White card with shadow-2xl, rounded-2xl\\n- Violet accent buttons",
+  "message": "Created a beautiful contact form with validation",
   "files": [
     {
       "path": "src/App.tsx",
-      "content": "import { useState } from 'react';\\n\\nfunction App() {\\n  const [count, setCount] = useState(0);\\n\\n  return (\\n    <div className=\\"min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center\\">\\n      <div className=\\"bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20\\">\\n        <h1 className=\\"text-2xl font-bold text-white mb-6 text-center\\">Counter</h1>\\n        <div className=\\"text-7xl font-bold text-white text-center mb-8\\">{count}</div>\\n        <div className=\\"flex gap-4\\">\\n          <button onClick={() => setCount(c => c - 1)} className=\\"px-8 py-4 bg-red-500 text-white text-2xl font-bold rounded-2xl hover:bg-red-600 transition-all shadow-lg\\">-</button>\\n          <button onClick={() => setCount(c => c + 1)} className=\\"px-8 py-4 bg-green-500 text-white text-2xl font-bold rounded-2xl hover:bg-green-600 transition-all shadow-lg\\">+</button>\\n        </div>\\n      </div>\\n    </div>\\n  );\\n}\\n\\nexport default App;",
+      "content": "// Complete React TypeScript code here",
       "action": "modify"
     }
   ]
 }
 
-=== END EXAMPLE ===
+## CRITICAL RULES
 
-CRITICAL RULES:
-1. Your response MUST be valid JSON with "files" array
-2. NEVER use "html" field - only use "files" array
-3. Each file needs: path, content, action
-4. Content must be valid React TypeScript
-5. Use Tailwind CSS for styling
-6. Use useState/useEffect for state
-7. Make UI look premium with shadows, gradients, rounded corners`;
+1. The "thought" field MUST show your structured analysis (steps 1-4)
+2. ALWAYS use "files" array, NEVER use "html" field
+3. Use Tailwind CSS for ALL styling
+4. Use JSX comments {/* comment */} NOT HTML comments <!-- -->
+5. Self-close tags: <img />, <input />, <br />
+6. Use className not class
+7. Make UI look PREMIUM with gradients, shadows, transitions
+8. Export default the main component`;
 
 
 
@@ -238,8 +258,8 @@ export default App;`,
     const generationConfig = type === "random"
       ? { temperature: 1.2, maxOutputTokens: 100, responseMimeType: "text/plain" }
       : type === "generate-multifile"
-        ? { temperature: 0.8, maxOutputTokens: 16384, responseMimeType: "application/json", responseSchema: multiFileSchema }
-        : { temperature: 0.8, maxOutputTokens: 16384, responseMimeType: "application/json" };
+        ? { temperature: 0.7, maxOutputTokens: 32768, responseMimeType: "application/json", responseSchema: multiFileSchema }
+        : { temperature: 0.7, maxOutputTokens: 32768, responseMimeType: "application/json" };
 
     console.log("Generation config:", JSON.stringify({ type, hasSchema: !!generationConfig.responseSchema }));
 
@@ -373,6 +393,9 @@ export default App;
       parsed.files = parsed.files.map((file: { path: string; content: string; action: string }) => {
         if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
           let fixedContent = file.content;
+
+          // Fix HTML comments to JSX comments (CRITICAL - causes "Unexpected token" error)
+          fixedContent = fixedContent.replace(/<!--\s*([\s\S]*?)\s*-->/g, '{/* $1 */}');
 
           // Fix self-closing tags (img, br, input, hr, meta, link)
           fixedContent = fixedContent.replace(/<(img|br|input|hr|meta|link)([^>]*?)(?<!\/)>/gi, '<$1$2 />');
