@@ -775,6 +775,224 @@ export default App;`,
               ]
             })
           }]
+        },
+        // Example 6: Dashboard with Charts (recharts)
+        {
+          role: "user",
+          parts: [{ text: "Create a sales dashboard with charts" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- Dashboard page with charts\n- StatCard component\n\n## 2. STATE\n- salesData array (static)\n\n## 3. FUNCTIONS\n- None needed (static display)\n\n## 4. STYLING\n- Grid layout, glassmorphic cards, responsive\n\n## 5. FILE PLAN\n- CREATE src/components/StatCard.tsx\n- CREATE src/pages/Dashboard.tsx\n- MODIFY src/App.tsx",
+              message: "Created sales dashboard with LineChart and stats",
+              files: [
+                {
+                  path: "src/components/StatCard.tsx",
+                  content: `import { TrendingUp, TrendingDown } from 'lucide-react';
+
+interface StatCardProps {
+  title: string;
+  value: string;
+  change: string;
+  positive: boolean;
+}
+
+export function StatCard({ title, value, change, positive }: StatCardProps) {
+  return (
+    <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+      <p className="text-slate-400 text-sm">{title}</p>
+      <p className="text-3xl font-bold text-white mt-2">{value}</p>
+      <div className={\`flex items-center gap-1 text-sm mt-2 \${positive ? 'text-emerald-400' : 'text-red-400'}\`}>
+        {positive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+        {change}
+      </div>
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/pages/Dashboard.tsx",
+                  content: `import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { StatCard } from '../components/StatCard';
+
+const salesData = [
+  { month: 'Jan', sales: 4000, orders: 240 },
+  { month: 'Feb', sales: 3000, orders: 198 },
+  { month: 'Mar', sales: 5000, orders: 300 },
+  { month: 'Apr', sales: 4500, orders: 278 },
+  { month: 'May', sales: 6000, orders: 389 },
+  { month: 'Jun', sales: 5500, orders: 349 },
+];
+
+export function Dashboard() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+      <h1 className="text-3xl font-bold text-white mb-8">Sales Dashboard</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <StatCard title="Total Revenue" value="$45,231" change="+20.1% from last month" positive={true} />
+        <StatCard title="Active Users" value="2,350" change="+15.2% from last month" positive={true} />
+        <StatCard title="Bounce Rate" value="12.5%" change="+2.3% from last month" positive={false} />
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+          <h2 className="text-xl font-semibold text-white mb-4">Sales Trend</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={salesData}>
+              <XAxis dataKey="month" stroke="#94a3b8" />
+              <YAxis stroke="#94a3b8" />
+              <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
+              <Line type="monotone" dataKey="sales" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6' }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/10">
+          <h2 className="text-xl font-semibold text-white mb-4">Orders by Month</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={salesData}>
+              <XAxis dataKey="month" stroke="#94a3b8" />
+              <YAxis stroke="#94a3b8" />
+              <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
+              <Bar dataKey="orders" fill="#22d3ee" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { Dashboard } from './pages/Dashboard';
+
+function App() {
+  return <Dashboard />;
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
+        },
+        // Example 7: Animated Component with framer-motion
+        {
+          role: "user",
+          parts: [{ text: "Create an animated card list with add/remove" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- AnimatedCardList with motion\n\n## 2. STATE\n- cards: Card[] array\n- nextId: number for unique keys\n\n## 3. FUNCTIONS\n- addCard, removeCard\n\n## 4. STYLING\n- Staggered animations, exit animations, glassmorphic cards\n\n## 5. FILE PLAN\n- CREATE src/components/AnimatedCardList.tsx\n- MODIFY src/App.tsx",
+              message: "Created animated card list with staggered enter/exit animations",
+              files: [
+                {
+                  path: "src/components/AnimatedCardList.tsx",
+                  content: `import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, X } from 'lucide-react';
+
+interface Card {
+  id: number;
+  title: string;
+}
+
+export function AnimatedCardList() {
+  const [cards, setCards] = useState<Card[]>([
+    { id: 1, title: 'First Card' },
+    { id: 2, title: 'Second Card' },
+  ]);
+  const [nextId, setNextId] = useState<number>(3);
+
+  const addCard = () => {
+    setCards([...cards, { id: nextId, title: \`Card \${nextId}\` }]);
+    setNextId(nextId + 1);
+  };
+
+  const removeCard = (id: number) => {
+    setCards(cards.filter(c => c.id !== id));
+  };
+
+  return (
+    <div className="space-y-4">
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={addCard}
+        className="px-4 py-2 bg-gradient-to-r from-violet-500 to-purple-500 text-white rounded-xl flex items-center gap-2 shadow-lg"
+      >
+        <Plus className="w-5 h-5" />
+        Add Card
+      </motion.button>
+      
+      <AnimatePresence mode="popLayout">
+        {cards.map((card, index) => (
+          <motion.div
+            key={card.id}
+            layout
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -100, scale: 0.95 }}
+            transition={{ delay: index * 0.05, type: 'spring', stiffness: 300, damping: 25 }}
+            className="bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-white/10 flex justify-between items-center"
+          >
+            <span className="text-white font-medium">{card.title}</span>
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => removeCard(card.id)} 
+              className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </motion.button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      
+      {cards.length === 0 && (
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-slate-400 text-center py-8"
+        >
+          No cards yet. Add one!
+        </motion.p>
+      )}
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { AnimatedCardList } from './components/AnimatedCardList';
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-8">
+      <div className="w-full max-w-md">
+        <h1 className="text-2xl font-bold text-white mb-6">Animated Cards</h1>
+        <AnimatedCardList />
+      </div>
+    </div>
+  );
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
         }
       ];
 
