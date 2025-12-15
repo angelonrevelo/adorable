@@ -96,17 +96,49 @@ serve(async (req) => {
       ];
       systemInstruction = undefined;
     } else if (type === "generate-multifile") {
-      // Multi-file React generation with FEW-SHOT example
+      // Multi-file React generation with environment context
       const conversationHistory =
         history?.map((msg: { role: string; content: string }) => ({
           role: msg.role === "assistant" ? "model" : "user",
           parts: [{ text: msg.content }],
         })) || [];
 
+      // CRITICAL: Environment context preamble
+      const environmentContext = `
+=== ENVIRONMENT ===
+You are generating code for a React + TypeScript + Tailwind CSS project.
+
+FILE STRUCTURE:
+- index.html (contains Tailwind CDN - DO NOT REPLACE)
+- src/main.tsx (React entry point - DO NOT REPLACE)  
+- src/App.tsx (main component - THIS IS WHAT YOU GENERATE)
+- src/index.css (global styles)
+
+TECH STACK:
+- React 18 with TypeScript
+- Tailwind CSS (loaded via CDN, all classes available)
+- useState/useEffect for state management
+
+=== YOUR TASK ===
+Generate ONLY the content for src/App.tsx as a React component.
+Use Tailwind CSS classes for ALL styling (bg-*, text-*, flex, grid, etc).
+Make the UI look premium with shadows, rounded corners, and transitions.
+
+=== OUTPUT FORMAT ===
+Return JSON with a "files" array:
+{
+  "thought": "brief analysis",
+  "message": "what you created", 
+  "files": [{"path": "src/App.tsx", "content": "...", "action": "modify"}]
+}
+
+=== USER REQUEST ===
+`;
+
       // Build context with existing project files
-      let contextMessage = prompt;
+      let contextMessage = environmentContext + prompt;
       if (projectFiles && projectFiles.length > 0) {
-        contextMessage += "\n\nCURRENT PROJECT FILES:\n";
+        contextMessage += "\n\n--- EXISTING PROJECT FILES ---\n";
         for (const file of projectFiles) {
           contextMessage += `\n--- ${file.path} ---\n${file.content}\n`;
         }
@@ -334,6 +366,48 @@ export default App;
           }
         ]
       };
+    }
+
+    // SELF-FIXING: Fix common JSX syntax errors in generated files
+    if (parsed.files && Array.isArray(parsed.files)) {
+      parsed.files = parsed.files.map((file: { path: string; content: string; action: string }) => {
+        if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
+          let fixedContent = file.content;
+
+          // Fix self-closing tags (img, br, input, hr, meta, link)
+          fixedContent = fixedContent.replace(/<(img|br|input|hr|meta|link)([^>]*?)(?<!\/)>/gi, '<$1$2 />');
+
+          // Fix class= to className=
+          fixedContent = fixedContent.replace(/\bclass=/g, 'className=');
+
+          // Fix for= to htmlFor=
+          fixedContent = fixedContent.replace(/\bfor=/g, 'htmlFor=');
+
+          // Fix onclick to onClick (case insensitive)
+          fixedContent = fixedContent.replace(/\bonclick=/gi, 'onClick=');
+          fixedContent = fixedContent.replace(/\bonchange=/gi, 'onChange=');
+          fixedContent = fixedContent.replace(/\bonsubmit=/gi, 'onSubmit=');
+          fixedContent = fixedContent.replace(/\bonkeydown=/gi, 'onKeyDown=');
+          fixedContent = fixedContent.replace(/\bonkeyup=/gi, 'onKeyUp=');
+
+          // Fix tabindex to tabIndex
+          fixedContent = fixedContent.replace(/\btabindex=/gi, 'tabIndex=');
+          fixedContent = fixedContent.replace(/\bcolspan=/gi, 'colSpan=');
+          fixedContent = fixedContent.replace(/\browspan=/gi, 'rowSpan=');
+          fixedContent = fixedContent.replace(/\bcellpadding=/gi, 'cellPadding=');
+          fixedContent = fixedContent.replace(/\bcellspacing=/gi, 'cellSpacing=');
+
+          // Ensure file exports default
+          if (!fixedContent.includes('export default')) {
+            fixedContent += '\n\nexport default App;\n';
+          }
+
+          return { ...file, content: fixedContent };
+        }
+        return file;
+      });
+
+      console.log("Applied JSX self-fixing to generated files");
     }
 
     return new Response(JSON.stringify(parsed), {
