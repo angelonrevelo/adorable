@@ -197,8 +197,8 @@ export function IDEChatPanel() {
                 {/* Header */}
                 <div className="flex items-center gap-3 p-4 border-b border-white/5">
                     <div className="flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-400" />
-                        <h1 className="font-semibold text-white">Hatable</h1>
+                        <Sparkles className="w-5 h-5 text-yellow-400" />
+                        <h1 className="font-semibold text-white">Killable</h1>
                     </div>
                     <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">
                         AI IDE
@@ -207,8 +207,8 @@ export function IDEChatPanel() {
 
                 {/* Template Selection */}
                 <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
-                    <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center">
-                        <FolderPlus className="w-8 h-8 text-purple-400" />
+                    <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center">
+                        <FolderPlus className="w-8 h-8 text-yellow-400" />
                     </div>
 
                     <div className="text-center space-y-2">
@@ -224,7 +224,7 @@ export function IDEChatPanel() {
                                 key={template.id}
                                 onClick={() => handleCreateProject(template.id)}
                                 className="flex items-center gap-3 p-4 bg-[#111118] border border-white/5 rounded-xl 
-                           hover:border-purple-500/30 hover:bg-purple-500/5 transition-all text-left"
+                           hover:border-yellow-500/30 hover:bg-yellow-500/5 transition-all text-left"
                             >
                                 <span className="text-2xl">{template.icon}</span>
                                 <div>
@@ -244,8 +244,8 @@ export function IDEChatPanel() {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
                 <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-purple-400" />
-                    <h1 className="font-semibold text-white">Hatable</h1>
+                    <Sparkles className="w-5 h-5 text-yellow-400" />
+                    <h1 className="font-semibold text-white">Killable</h1>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500 truncate max-w-[120px]">
@@ -255,11 +255,11 @@ export function IDEChatPanel() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-hide">
                 {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full space-y-4 animate-fade-in">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/10 flex items-center justify-center">
-                            <Sparkles className="w-7 h-7 text-purple-400" />
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-red-500/10 flex items-center justify-center">
+                            <Sparkles className="w-7 h-7 text-yellow-400" />
                         </div>
                         <div className="text-center space-y-2">
                             <h2 className="text-base font-medium text-white">Ready to build</h2>
@@ -279,7 +279,7 @@ export function IDEChatPanel() {
                                 )}
                             >
                                 {message.role === 'user' ? (
-                                    <div className="max-w-[85%] bg-purple-600/90 rounded-2xl rounded-br-md px-4 py-2.5 shadow-lg">
+                                    <div className="max-w-[85%] bg-gradient-to-r from-yellow-600/90 to-red-600/90 rounded-2xl rounded-br-md px-4 py-2.5 shadow-lg">
                                         <p className="text-sm text-white leading-relaxed">{message.content}</p>
                                     </div>
                                 ) : (
@@ -348,9 +348,9 @@ export function IDEChatPanel() {
                             <div className="flex items-center gap-3 animate-fade-in">
                                 <div className="flex items-center gap-2 px-3 py-2 bg-[#16161e] rounded-xl border border-white/5">
                                     <div className="flex gap-1">
-                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                                     </div>
                                     <span className="text-sm text-gray-400">Generating...</span>
                                 </div>
@@ -413,15 +413,15 @@ export function IDEChatPanel() {
                 )}
 
                 {/* Main Input Container */}
-                <div className="relative rounded-2xl bg-[#16161e] border border-white/10 focus-within:border-purple-500/40 focus-within:shadow-[0_0_20px_rgba(139,92,246,0.1)] transition-all">
+                <div className="relative rounded-2xl bg-[#16161e] border border-white/10 focus-within:border-yellow-500/40 focus-within:shadow-[0_0_20px_rgba(234,179,8,0.1)] transition-all">
                     <textarea
                         ref={textareaRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Make changes, add features, ask for anything..."
+                        placeholder="Ask Killable..."
                         className="w-full bg-transparent px-4 py-3 pr-24 text-sm text-white placeholder:text-gray-500 
-                       resize-none focus:outline-none min-h-[48px] max-h-[200px] leading-relaxed"
+                       resize-none focus:outline-none min-h-[48px] max-h-[200px] leading-relaxed scrollbar-hide"
                         rows={1}
                         disabled={isGenerating}
                     />
@@ -455,9 +455,9 @@ export function IDEChatPanel() {
                         {/* Right side actions */}
                         <div className="flex items-center gap-2">
                             {/* Chat mode indicator */}
-                            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-purple-600/20 rounded-full">
-                                <MessageSquare className="w-3 h-3 text-purple-400" />
-                                <span className="text-xs font-medium text-purple-400">Chat</span>
+                            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-yellow-600/20 rounded-full">
+                                <MessageSquare className="w-3 h-3 text-yellow-400" />
+                                <span className="text-xs font-medium text-yellow-400">Chat</span>
                             </div>
 
                             {/* Send button */}
@@ -467,7 +467,7 @@ export function IDEChatPanel() {
                                 className={cn(
                                     "p-2 rounded-xl transition-all",
                                     input.trim() && !isGenerating
-                                        ? "bg-purple-600 text-white hover:bg-purple-500 shadow-lg shadow-purple-500/25"
+                                        ? "bg-gradient-to-r from-yellow-500 to-red-500 text-white hover:from-yellow-400 hover:to-red-400 shadow-lg shadow-yellow-500/25"
                                         : "bg-white/5 text-gray-500 cursor-not-allowed"
                                 )}
                             >
