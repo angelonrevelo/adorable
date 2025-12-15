@@ -74,8 +74,9 @@ function PreviewContent() {
     const [viewport, setViewport] = useState<ViewportSize>('desktop');
 
     return (
-        <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between px-3 py-2 bg-[#111118] border-b border-white/5">
+        <div className="absolute inset-0 flex flex-col">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-3 py-2 bg-[#111118] border-b border-white/5 flex-shrink-0">
                 <div className="flex items-center gap-1">
                     {(Object.entries(viewportSizes) as [ViewportSize, typeof viewportSizes.desktop][]).map(
                         ([size, { icon: Icon }]) => (
@@ -112,28 +113,31 @@ function PreviewContent() {
                 </div>
             </div>
 
-            <div
-                className="flex-1 overflow-hidden flex items-stretch justify-center"
-                style={{ backgroundColor: '#1a1a24' }}
-            >
+            {/* Preview Area - takes remaining height */}
+            <div className="flex-1 relative min-h-0" style={{ backgroundColor: '#1a1a24' }}>
                 <div
-                    className="h-full bg-white overflow-hidden transition-all duration-300"
-                    style={{
-                        width: viewportSizes[viewport].width,
-                        maxWidth: '100%',
-                    }}
+                    className="absolute inset-0 flex items-stretch justify-center overflow-hidden"
                 >
-                    <SandpackPreview
-                        showNavigator={false}
-                        showRefreshButton={false}
-                        showOpenInCodeSandbox={false}
-                        style={{ height: '100%', width: '100%' }}
-                    />
+                    <div
+                        className="h-full bg-white overflow-hidden transition-all duration-300"
+                        style={{
+                            width: viewportSizes[viewport].width,
+                            maxWidth: '100%',
+                        }}
+                    >
+                        <SandpackPreview
+                            showNavigator={false}
+                            showRefreshButton={false}
+                            showOpenInCodeSandbox={false}
+                            style={{ height: '100%', width: '100%' }}
+                        />
+                    </div>
                 </div>
             </div>
 
+            {/* Console - fixed height at bottom */}
             {showConsole && (
-                <div className="h-48 border-t border-white/10 bg-[#0a0a0f]">
+                <div className="h-48 border-t border-white/10 bg-[#0a0a0f] flex-shrink-0">
                     <SandpackConsole
                         style={{ height: '100%' }}
                     />
