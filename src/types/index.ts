@@ -25,8 +25,18 @@ export interface GenerationResult {
   pages: Page[];
 }
 
+export interface FileOperation {
+  path: string;
+  content: string;
+  action: 'create' | 'modify' | 'delete';
+}
+
 export interface GenerateVibeResponse {
   thought: string;
-  html: string;
-  title: string;
+  html?: string;       // Legacy single-file HTML
+  title?: string;      // Legacy title
+  files?: FileOperation[];  // New multi-file format
+  message?: string;    // Optional message for chat
+  dependencies?: Record<string, string>;  // NPM packages to add
 }
+
