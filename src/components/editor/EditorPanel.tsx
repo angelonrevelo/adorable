@@ -1,5 +1,5 @@
 import Editor, { OnMount, OnChange } from '@monaco-editor/react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, forwardRef } from 'react';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { EditorTabs } from './EditorTabs';
 import { FileCode } from 'lucide-react';
@@ -21,7 +21,7 @@ function getMonacoLanguage(path: string): string {
     }
 }
 
-export function EditorPanel() {
+export const EditorPanel = forwardRef<HTMLDivElement>((_, ref) => {
     const { files, activeFile, updateFileContent, openFiles } = useProjectStore();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
@@ -74,7 +74,7 @@ export function EditorPanel() {
     // No files open state
     if (openFiles.length === 0) {
         return (
-            <div className="flex-1 flex flex-col bg-[#0a0a0f]">
+            <div ref={ref} className="flex-1 flex flex-col bg-[#0a0a0f]">
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center space-y-4">
                         <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto">
@@ -93,7 +93,7 @@ export function EditorPanel() {
     }
 
     return (
-        <div className="h-full flex flex-col bg-[#0a0a0f] min-w-0">
+        <div ref={ref} className="h-full flex flex-col bg-[#0a0a0f] min-w-0">
             <EditorTabs />
 
             <div className="flex-1 overflow-hidden">
@@ -154,4 +154,6 @@ export function EditorPanel() {
             </div>
         </div>
     );
-}
+});
+
+EditorPanel.displayName = 'EditorPanel';

@@ -1463,9 +1463,29 @@ export default App;`,
       // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (innerE) {
+          console.error("Failed to parse extracted JSON:", innerE);
+          // Return graceful error response for safety filter triggers
+          return new Response(JSON.stringify({
+            thought: "The AI couldn't process this request",
+            message: "I can't help with that request. Please try rephrasing or ask for something different.",
+            files: []
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       } else {
-        throw new Error("Invalid JSON response from Gemini");
+        console.error("No JSON found in AI response, returning graceful error");
+        // Return graceful error response instead of throwing
+        return new Response(JSON.stringify({
+          thought: "The AI response was not in the expected format",
+          message: "I couldn't generate code for that request. Please try again with a different prompt.",
+          files: []
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
     }
 
