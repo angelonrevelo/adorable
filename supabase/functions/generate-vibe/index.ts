@@ -27,30 +27,38 @@ OUTPUT FORMAT - Respond ONLY with valid JSON:
   "title": "Short title (2-4 words)"
 }`;
 
-// React multi-file generation prompt - NO HTML references
+// React multi-file generation prompt with FEW-SHOT EXAMPLE
 const multiFileSystemPrompt = `You are a React developer. Generate React TypeScript components.
 
-REQUIRED OUTPUT FORMAT (you MUST use this exact JSON structure):
+OUTPUT FORMAT: You MUST return JSON with a "files" array containing React components.
 
+=== EXAMPLE ===
+
+User: "Create a counter with + and - buttons"
+
+Your response:
 {
-  "thought": "your brief analysis",
-  "message": "what you built",
+  "thought": "Creating a counter component with increment/decrement functionality using useState",
+  "message": "Created a beautiful counter app with + and - buttons",
   "files": [
     {
       "path": "src/App.tsx",
-      "content": "import { useState } from 'react';\\n\\nfunction App() {\\n  return <div>content</div>;\\n}\\n\\nexport default App;",
+      "content": "import { useState } from 'react';\\n\\nfunction App() {\\n  const [count, setCount] = useState(0);\\n\\n  return (\\n    <div className=\\"min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center\\">\\n      <div className=\\"bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20\\">\\n        <h1 className=\\"text-2xl font-bold text-white mb-6 text-center\\">Counter</h1>\\n        <div className=\\"text-7xl font-bold text-white text-center mb-8\\">{count}</div>\\n        <div className=\\"flex gap-4\\">\\n          <button onClick={() => setCount(c => c - 1)} className=\\"px-8 py-4 bg-red-500 text-white text-2xl font-bold rounded-2xl hover:bg-red-600 transition-all shadow-lg\\">-</button>\\n          <button onClick={() => setCount(c => c + 1)} className=\\"px-8 py-4 bg-green-500 text-white text-2xl font-bold rounded-2xl hover:bg-green-600 transition-all shadow-lg\\">+</button>\\n        </div>\\n      </div>\\n    </div>\\n  );\\n}\\n\\nexport default App;",
       "action": "modify"
     }
   ]
 }
 
-RULES:
-- Output MUST be a JSON object with "files" array
-- Each file MUST have path, content, and action
-- Content MUST be valid React TypeScript
-- Use Tailwind CSS classes for styling
-- Use useState/useEffect for state
-- Make UI premium: rounded-xl, shadow-lg, transitions`;
+=== END EXAMPLE ===
+
+CRITICAL RULES:
+1. Your response MUST be valid JSON with "files" array
+2. NEVER use "html" field - only use "files" array
+3. Each file needs: path, content, action
+4. Content must be valid React TypeScript
+5. Use Tailwind CSS for styling
+6. Use useState/useEffect for state
+7. Make UI look premium with shadows, gradients, rounded corners`;
 
 
 
@@ -69,7 +77,7 @@ serve(async (req) => {
 
     console.log("Received request:", { type, promptLength: prompt?.length, historyLength: history?.length });
 
-    const model = "gemini-2.5-flash-preview-05-20";
+    const model = "gemini-1.5-pro-latest";
 
     let messages;
     let systemInstruction;
@@ -88,7 +96,7 @@ serve(async (req) => {
       ];
       systemInstruction = undefined;
     } else if (type === "generate-multifile") {
-      // Multi-file React generation
+      // Multi-file React generation with FEW-SHOT example
       const conversationHistory =
         history?.map((msg: { role: string; content: string }) => ({
           role: msg.role === "assistant" ? "model" : "user",
@@ -104,21 +112,48 @@ serve(async (req) => {
         }
       }
 
-      // Add explicit format instructions to the user message
-      contextMessage += `
+      // FEW-SHOT: Add example conversation turns to teach the model
+      const fewShotExample = [
+        {
+          role: "user",
+          parts: [{ text: "Create a counter with + and - buttons" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "Creating a counter component with useState",
+              message: "Created a beautiful counter app",
+              files: [{
+                path: "src/App.tsx",
+                content: `import { useState } from 'react';
 
-IMPORTANT: You MUST respond with this EXACT JSON format containing a "files" array:
-{
-  "thought": "your analysis",
-  "message": "what you created",
-  "files": [
-    {"path": "src/App.tsx", "content": "// React code here", "action": "modify"}
-  ]
+function App() {
+  const [count, setCount] = useState(0);
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="bg-white/10 rounded-3xl p-8 shadow-2xl">
+        <h1 className="text-2xl font-bold text-white mb-6">Counter</h1>
+        <div className="text-6xl font-bold text-white mb-8">{count}</div>
+        <div className="flex gap-4">
+          <button onClick={() => setCount(c => c - 1)} className="px-6 py-3 bg-red-500 text-white rounded-xl">-</button>
+          <button onClick={() => setCount(c => c + 1)} className="px-6 py-3 bg-green-500 text-white rounded-xl">+</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-Generate a COMPLETE React TypeScript component. Use Tailwind CSS classes for styling. Include all game/app logic inside the component using useState and useEffect.`;
+export default App;`,
+                action: "modify"
+              }]
+            })
+          }]
+        }
+      ];
 
       messages = [
+        ...fewShotExample,
         ...conversationHistory,
         {
           role: "user",
