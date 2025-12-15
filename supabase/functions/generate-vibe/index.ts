@@ -123,46 +123,61 @@ serve(async (req) => {
           parts: [{ text: msg.content }],
         })) || [];
 
-      // CRITICAL: Environment context preamble
+      // CRITICAL: Environment context preamble with MODIFY-not-REPLACE rule
       const environmentContext = `
-=== ENVIRONMENT ===
-You are generating code for a React + TypeScript + Tailwind CSS project.
+=== CRITICAL RULES ===
 
-FILE STRUCTURE:
-- index.html (contains Tailwind CDN - DO NOT REPLACE)
-- src/main.tsx (React entry point - DO NOT REPLACE)  
-- src/App.tsx (main component - THIS IS WHAT YOU GENERATE)
-- src/index.css (global styles)
+1. MODIFY, DON'T REPLACE: You are modifying an EXISTING React application.
+   - NEVER delete existing components that the user didn't mention
+   - ADD new features to the existing code
+   - PRESERVE the existing design, styling, and structure
+   
+2. If user says "add X", add X to the existing code - don't create a brand new page
 
-TECH STACK:
+3. PRESERVE EXISTING CODE: Look at the "CURRENT CODE" section below. 
+   - Keep the existing App component structure
+   - Keep existing CSS classes, shadows, styling
+   - Keep existing navigation/layout
+   - Only ADD or MODIFY the specific parts the user asked for
+
+=== TECH STACK ===
 - React 18 with TypeScript
-- Tailwind CSS (loaded via CDN, all classes available)
-- useState/useEffect for state management
+- Tailwind CSS (ALL classes available)
+- useState/useEffect for state
 
-=== YOUR TASK ===
-Generate ONLY the content for src/App.tsx as a React component.
-Use Tailwind CSS classes for ALL styling (bg-*, text-*, flex, grid, etc).
-Make the UI look premium with shadows, rounded corners, and transitions.
+=== DESIGN REQUIREMENTS ===
+- PREMIUM DESIGN: Use gradients, shadows, rounded corners, transitions
+- Dark mode: Use slate-900, slate-800 backgrounds
+- Accent colors: Use violet, purple, amber gradients
+- Glassmorphism: bg-white/10 backdrop-blur-xl
+- NEVER use plain gray backgrounds or unstyled forms
 
 === OUTPUT FORMAT ===
-Return JSON with a "files" array:
+Return JSON with "files" array:
 {
-  "thought": "brief analysis",
-  "message": "what you created", 
+  "thought": "## WHAT I'M KEEPING\\n- existing navbar\\n- existing layout\\n\\n## WHAT I'M ADDING\\n- sign in form component",
+  "message": "Added sign in form to the app", 
   "files": [{"path": "src/App.tsx", "content": "...", "action": "modify"}]
 }
 
-=== USER REQUEST ===
+=== CURRENT CODE ===
 `;
 
-      // Build context with existing project files
-      let contextMessage = environmentContext + prompt;
+      // Build context with existing project files - THIS IS CRITICAL
+      let contextMessage = environmentContext;
       if (projectFiles && projectFiles.length > 0) {
-        contextMessage += "\n\n--- EXISTING PROJECT FILES ---\n";
         for (const file of projectFiles) {
-          contextMessage += `\n--- ${file.path} ---\n${file.content}\n`;
+          if (file.path.includes('App.tsx') || file.path.includes('App.jsx')) {
+            contextMessage += `\n--- ${file.path} (PRESERVE THIS STRUCTURE) ---\n${file.content}\n`;
+          } else {
+            contextMessage += `\n--- ${file.path} ---\n${file.content}\n`;
+          }
         }
+      } else {
+        contextMessage += "\n(No existing files - create from scratch)\n";
       }
+
+      contextMessage += `\n=== USER REQUEST ===\n${prompt}\n\n=== REMEMBER: MODIFY the existing code above, don't replace it! ===`;
 
       // FEW-SHOT: Add example conversation turns to teach the model
       const fewShotExample = [
@@ -457,9 +472,12 @@ export default App;
       console.log("Self-fixing applied:", debugLog.join('\n'));
     }
 
-    // Add debug info to response if in debug mode
+    // Add debug info to response
     if (type === 'generate-multifile') {
       parsed._debug = debugLog;
+      // Add system prompt and context for debug panel
+      parsed._systemPrompt = multiFileSystemPrompt;
+      parsed._contextSent = "Check Supabase function logs for full context";
     }
 
     // CRITICAL DEBUG: Log final response before sending

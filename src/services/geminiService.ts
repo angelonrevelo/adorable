@@ -40,6 +40,7 @@ export async function generateVibe(
   // Build debug info
   const debugInfo = {
     userPrompt: prompt,
+    systemPrompt: data._systemPrompt || 'Not returned by server',
     rawResponse: JSON.stringify(data, null, 2),
     parsedResponse: {
       thought: data.thought,
