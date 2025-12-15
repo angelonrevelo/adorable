@@ -389,16 +389,31 @@ export default App;
     }
 
     // SELF-FIXING: Fix common JSX syntax errors in generated files
+    // Create debug log
+    const debugLog: string[] = [];
+    debugLog.push(`[DEBUG] Type: ${type}`);
+    debugLog.push(`[DEBUG] Has files: ${!!(parsed.files && Array.isArray(parsed.files))}`);
+    debugLog.push(`[DEBUG] Has html: ${!!parsed.html}`);
+
     if (parsed.files && Array.isArray(parsed.files)) {
+      debugLog.push(`[DEBUG] Processing ${parsed.files.length} files`);
+
       parsed.files = parsed.files.map((file: { path: string; content: string; action: string }) => {
         if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
           let fixedContent = file.content;
+          const originalLength = fixedContent.length;
 
-          // Fix HTML comments to JSX comments (CRITICAL - causes "Unexpected token" error)
+          // Fix HTML comments to JSX comments
           fixedContent = fixedContent.replace(/<!--\s*([\s\S]*?)\s*-->/g, '{/* $1 */}');
 
-          // Fix self-closing tags (img, br, input, hr, meta, link)
-          fixedContent = fixedContent.replace(/<(img|br|input|hr|meta|link)([^>]*?)(?<!\/)>/gi, '<$1$2 />');
+          // Fix self-closing tags - more robust regex without lookbehind
+          // First, fix already-broken ones like <input > or <input attr>
+          fixedContent = fixedContent.replace(/<(img|br|input|hr|meta|link|area|base|col|embed|keygen|param|source|track|wbr)(\s+[^>]*)?>/gi, (match, tag, attrs) => {
+            // If it already ends with />, leave it
+            if (match.endsWith('/>')) return match;
+            // Otherwise add />
+            return `<${tag}${attrs || ''} />`;
+          });
 
           // Fix class= to className=
           fixedContent = fixedContent.replace(/\bclass=/g, 'className=');
@@ -406,32 +421,51 @@ export default App;
           // Fix for= to htmlFor=
           fixedContent = fixedContent.replace(/\bfor=/g, 'htmlFor=');
 
-          // Fix onclick to onClick (case insensitive)
+          // Fix event handlers
           fixedContent = fixedContent.replace(/\bonclick=/gi, 'onClick=');
           fixedContent = fixedContent.replace(/\bonchange=/gi, 'onChange=');
           fixedContent = fixedContent.replace(/\bonsubmit=/gi, 'onSubmit=');
           fixedContent = fixedContent.replace(/\bonkeydown=/gi, 'onKeyDown=');
           fixedContent = fixedContent.replace(/\bonkeyup=/gi, 'onKeyUp=');
+          fixedContent = fixedContent.replace(/\bonfocus=/gi, 'onFocus=');
+          fixedContent = fixedContent.replace(/\bonblur=/gi, 'onBlur=');
 
-          // Fix tabindex to tabIndex
+          // Fix other attributes
           fixedContent = fixedContent.replace(/\btabindex=/gi, 'tabIndex=');
           fixedContent = fixedContent.replace(/\bcolspan=/gi, 'colSpan=');
           fixedContent = fixedContent.replace(/\browspan=/gi, 'rowSpan=');
           fixedContent = fixedContent.replace(/\bcellpadding=/gi, 'cellPadding=');
           fixedContent = fixedContent.replace(/\bcellspacing=/gi, 'cellSpacing=');
+          fixedContent = fixedContent.replace(/\breadonly\b/gi, 'readOnly');
+          fixedContent = fixedContent.replace(/\bmaxlength=/gi, 'maxLength=');
+          fixedContent = fixedContent.replace(/\bminlength=/gi, 'minLength=');
+          fixedContent = fixedContent.replace(/\bautocomplete=/gi, 'autoComplete=');
+          fixedContent = fixedContent.replace(/\bautofocus\b/gi, 'autoFocus');
 
           // Ensure file exports default
           if (!fixedContent.includes('export default')) {
             fixedContent += '\n\nexport default App;\n';
           }
 
+          debugLog.push(`[DEBUG] Fixed ${file.path}: ${originalLength} -> ${fixedContent.length} chars`);
+
           return { ...file, content: fixedContent };
         }
         return file;
       });
 
-      console.log("Applied JSX self-fixing to generated files");
+      console.log("Self-fixing applied:", debugLog.join('\n'));
     }
+
+    // Add debug info to response if in debug mode
+    if (type === 'generate-multifile') {
+      parsed._debug = debugLog;
+    }
+
+    // CRITICAL DEBUG: Log final response before sending
+    console.log("FINAL RESPONSE KEYS:", Object.keys(parsed));
+    console.log("Has files:", !!parsed.files);
+    console.log("Has html:", !!parsed.html);
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

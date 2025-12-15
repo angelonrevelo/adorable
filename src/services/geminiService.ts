@@ -67,12 +67,8 @@ export async function generateVibe(
 
   return response;
 }
-
 // Convert standalone HTML to a React component
 function convertHtmlToReact(html: string): string {
-  // Basic conversion - wrap HTML in a React component
-  // This is a simplified version; a real implementation would parse and convert properly
-
   // Check if it's already a React component
   if (html.includes('export default') || html.includes('function App')) {
     return html;
@@ -86,17 +82,47 @@ function convertHtmlToReact(html: string): string {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   let content = bodyMatch ? bodyMatch[1] : html;
 
-  // Remove script tags for now (would need proper handling)
+  // Remove script tags
   content = content.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
 
-  // Basic HTML to JSX conversions
-  content = content
-    .replace(/class=/g, 'className=')
-    .replace(/for=/g, 'htmlFor=')
-    .replace(/onclick=/gi, 'onClick=')
-    .replace(/onchange=/gi, 'onChange=');
+  // === CRITICAL JSX FIXES ===
 
-  return `import './App.css';
+  // 1. Fix HTML comments to JSX comments
+  content = content.replace(/<!--\s*([\s\S]*?)\s*-->/g, '{/* $1 */}');
+
+  // 2. Fix self-closing tags (CRITICAL - causes "Expected closing tag" error)
+  content = content.replace(/<(img|br|input|hr|meta|link|area|base|col|embed|keygen|param|source|track|wbr)(\s+[^>]*)?>/gi, (match, tag, attrs) => {
+    if (match.endsWith('/>')) return match;
+    return `<${tag}${attrs || ''} />`;
+  });
+
+  // 3. Fix class= to className=
+  content = content.replace(/\bclass=/g, 'className=');
+
+  // 4. Fix for= to htmlFor=
+  content = content.replace(/\bfor=/g, 'htmlFor=');
+
+  // 5. Fix event handlers
+  content = content.replace(/\bonclick=/gi, 'onClick=');
+  content = content.replace(/\bonchange=/gi, 'onChange=');
+  content = content.replace(/\bonsubmit=/gi, 'onSubmit=');
+  content = content.replace(/\bonkeydown=/gi, 'onKeyDown=');
+  content = content.replace(/\bonkeyup=/gi, 'onKeyUp=');
+  content = content.replace(/\bonfocus=/gi, 'onFocus=');
+  content = content.replace(/\bonblur=/gi, 'onBlur=');
+
+  // 6. Fix other attributes
+  content = content.replace(/\btabindex=/gi, 'tabIndex=');
+  content = content.replace(/\bcolspan=/gi, 'colSpan=');
+  content = content.replace(/\browspan=/gi, 'rowSpan=');
+  content = content.replace(/\breadonly\b/gi, 'readOnly');
+  content = content.replace(/\bmaxlength=/gi, 'maxLength=');
+  content = content.replace(/\bminlength=/gi, 'minLength=');
+  content = content.replace(/\bautocomplete=/gi, 'autoComplete=');
+  content = content.replace(/\bautofocus\b/gi, 'autoFocus');
+  content = content.replace(/\bplaceholder=/gi, 'placeholder=');
+
+  return `import { useState } from 'react';
 
 function App() {
   return (
