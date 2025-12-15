@@ -130,11 +130,14 @@ Your response MUST be valid JSON with this exact structure:
 3. Use Tailwind classes, NOT inline styles
 4. Every component must be fully styled and functional
 5. Include proper TypeScript types
-6. Use react-router-dom for navigation
+6. DO NOT use react-router-dom - use simple state-based navigation with useState instead
 7. Make the UI look PREMIUM - rounded corners, shadows, gradients, proper spacing
 8. Parse user's color preferences and apply them throughout
 9. For complex apps, create reusable components in components/ui/
-10. NEVER generate skeleton code - every function must work`;
+10. NEVER generate skeleton code - every function must work
+11. ALWAYS use self-closing JSX tags: <img />, <br />, <input />, <hr /> - NEVER <img> without closing
+12. VERIFY all JSX brackets are properly closed before responding
+13. Use className for CSS classes, NOT class`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
