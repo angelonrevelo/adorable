@@ -36,6 +36,7 @@ Before writing any code, analyze the request using this structure:
 
 ### 1. COMPONENTS
 - What React components are needed?
+- Which are NEW files vs modifications to existing files?
 - What is the component hierarchy?
 
 ### 2. STATE  
@@ -50,20 +51,44 @@ Before writing any code, analyze the request using this structure:
 - What Tailwind classes for layout? (flex, grid, etc.)
 - What colors, shadows, spacing to use?
 
-### 5. CODE GENERATION
-After planning, write the complete React code.
+### 5. FILE PLAN
+- List EVERY file you will create or modify
+- Use action: "create" for new files, "modify" for existing
+
+## FILE STRUCTURE RULES (CRITICAL)
+
+1. **ALWAYS create separate component files for new features:**
+   - New pages → src/pages/PageName.tsx
+   - New components → src/components/ComponentName.tsx
+   - Utility functions → src/utils/utilName.ts
+   - Hooks → src/hooks/useHookName.ts
+
+2. **NEVER put more than 150 lines in App.tsx**
+   - App.tsx should only contain routing/layout and imports
+   - Extract complex logic into separate components
+
+3. **When user asks for a new feature:**
+   - Create the feature in its own file
+   - Modify App.tsx to import and render it
+
+4. **Return MULTIPLE files in the "files" array when needed**
 
 ## OUTPUT FORMAT
 
 You MUST respond with this exact JSON structure:
 
 {
-  "thought": "## 1. COMPONENTS\\n- App (main)\\n- Form component\\n\\n## 2. STATE\\n- formData: object with name, email, message\\n- isSubmitting: boolean\\n\\n## 3. FUNCTIONS\\n- handleChange: update form fields\\n- handleSubmit: validate and submit\\n\\n## 4. STYLING\\n- Dark gradient background\\n- White card with shadow-2xl, rounded-2xl\\n- Violet accent buttons",
-  "message": "Created a beautiful contact form with validation",
+  "thought": "## 1. COMPONENTS\\n- GalleryPage (new file)\\n- App (modify to import)\\n\\n## 2. STATE\\n- images array in GalleryPage\\n\\n## 3. FUNCTIONS\\n- handleImageClick\\n\\n## 4. STYLING\\n- Grid layout, glassmorphic cards\\n\\n## 5. FILE PLAN\\n- CREATE src/pages/GalleryPage.tsx\\n- MODIFY src/App.tsx",
+  "message": "Created a gallery page component",
   "files": [
     {
+      "path": "src/pages/GalleryPage.tsx",
+      "content": "// Complete component code",
+      "action": "create"
+    },
+    {
       "path": "src/App.tsx",
-      "content": "// Complete React TypeScript code here",
+      "content": "// Updated App with import",
       "action": "modify"
     }
   ]
@@ -71,14 +96,15 @@ You MUST respond with this exact JSON structure:
 
 ## CRITICAL RULES
 
-1. The "thought" field MUST show your structured analysis (steps 1-4)
+1. The "thought" field MUST show your structured analysis (steps 1-5)
 2. ALWAYS use "files" array, NEVER use "html" field
-3. Use Tailwind CSS for ALL styling
-4. Use JSX comments {/* comment */} NOT HTML comments <!-- -->
-5. Self-close tags: <img />, <input />, <br />
-6. Use className not class
-7. Make UI look PREMIUM with gradients, shadows, transitions
-8. Export default the main component`;
+3. CREATE new files for new features - don't cram everything into App.tsx
+4. Use Tailwind CSS for ALL styling
+5. Use JSX comments {/* comment */} NOT HTML comments <!-- -->
+6. Self-close tags: <img />, <input />, <br />
+7. Use className not class
+8. Make UI look PREMIUM with gradients, shadows, transitions
+9. Export default the main component`;
 
 
 
@@ -140,6 +166,19 @@ serve(async (req) => {
    - Keep existing navigation/layout
    - Only ADD or MODIFY the specific parts the user asked for
 
+=== FILE STRUCTURE (REQUIRED) ===
+- Pages go in: src/pages/PageName.tsx
+- Components go in: src/components/ComponentName.tsx  
+- Hooks go in: src/hooks/useHookName.ts
+- Utils go in: src/utils/utilName.ts
+- App.tsx should ONLY import and compose components, not contain all logic
+
+=== WHEN TO CREATE NEW FILES ===
+- New page requested → CREATE src/pages/PageName.tsx
+- New reusable component → CREATE src/components/ComponentName.tsx
+- Custom hook needed → CREATE src/hooks/useHookName.ts
+- ALWAYS return MULTIPLE files in the "files" array when creating features
+
 === TECH STACK ===
 - React 18 with TypeScript
 - Tailwind CSS (ALL classes available)
@@ -158,11 +197,14 @@ serve(async (req) => {
 - NEVER use plain gray backgrounds or unstyled forms
 
 === OUTPUT FORMAT ===
-Return JSON with "files" array:
+Return JSON with "files" array (MULTIPLE files when needed):
 {
-  "thought": "## WHAT I'M KEEPING\\n- existing navbar\\n- existing layout\\n\\n## WHAT I'M ADDING\\n- sign in form component",
-  "message": "Added sign in form to the app", 
-  "files": [{"path": "src/App.tsx", "content": "...", "action": "modify"}]
+  "thought": "## FILE PLAN\\n- CREATE src/pages/GalleryPage.tsx\\n- MODIFY src/App.tsx to import it",
+  "message": "Created gallery page", 
+  "files": [
+    {"path": "src/pages/GalleryPage.tsx", "content": "...", "action": "create"},
+    {"path": "src/App.tsx", "content": "...", "action": "modify"}
+  ]
 }
 
 === CURRENT CODE ===
@@ -184,7 +226,7 @@ Return JSON with "files" array:
 
       contextMessage += `\n=== USER REQUEST ===\n${prompt}\n\n=== REMEMBER: MODIFY the existing code above, don't replace it! ===`;
 
-      // FEW-SHOT: Add example conversation turns to teach the model
+      // FEW-SHOT: Multi-file example to teach model to create separate components
       const fewShotExample = [
         {
           role: "user",
@@ -194,31 +236,55 @@ Return JSON with "files" array:
           role: "model",
           parts: [{
             text: JSON.stringify({
-              thought: "Creating a counter component with useState",
-              message: "Created a beautiful counter app",
-              files: [{
-                path: "src/App.tsx",
-                content: `import { useState } from 'react';
+              thought: "## 1. COMPONENTS\n- Counter component (new file in src/components/)\n- App (modify to import Counter)\n\n## 2. STATE\n- count: number in Counter.tsx\n\n## 3. FUNCTIONS\n- increment/decrement handlers\n\n## 4. STYLING\n- Glassmorphic card, gradient buttons\n\n## 5. FILE PLAN\n- CREATE src/components/Counter.tsx\n- MODIFY src/App.tsx",
+              message: "Created a modular counter component",
+              files: [
+                {
+                  path: "src/components/Counter.tsx",
+                  content: `import { useState } from 'react';
+
+export function Counter() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10">
+      <h2 className="text-2xl font-bold text-white mb-6">Counter</h2>
+      <div className="text-6xl font-bold text-white mb-8 text-center">{count}</div>
+      <div className="flex gap-4 justify-center">
+        <button 
+          onClick={() => setCount(c => c - 1)} 
+          className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-colors"
+        >
+          -
+        </button>
+        <button 
+          onClick={() => setCount(c => c + 1)} 
+          className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-colors"
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { Counter } from './components/Counter';
 
 function App() {
-  const [count, setCount] = useState(0);
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-      <div className="bg-white/10 rounded-3xl p-8 shadow-2xl">
-        <h1 className="text-2xl font-bold text-white mb-6">Counter</h1>
-        <div className="text-6xl font-bold text-white mb-8">{count}</div>
-        <div className="flex gap-4">
-          <button onClick={() => setCount(c => c - 1)} className="px-6 py-3 bg-red-500 text-white rounded-xl">-</button>
-          <button onClick={() => setCount(c => c + 1)} className="px-6 py-3 bg-green-500 text-white rounded-xl">+</button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <Counter />
     </div>
   );
 }
 
 export default App;`,
-                action: "modify"
-              }]
+                  action: "modify"
+                }
+              ]
             })
           }]
         }
