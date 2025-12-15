@@ -37,9 +37,23 @@ export async function generateVibe(
     throw new Error(data.error);
   }
 
+  // Build debug info
+  const debugInfo = {
+    userPrompt: prompt,
+    rawResponse: JSON.stringify(data, null, 2),
+    parsedResponse: {
+      thought: data.thought,
+      message: data.message,
+      files: data.files?.map((f: { path: string; action: string }) => ({ path: f.path, action: f.action })),
+      html: data.html ? 'HTML content (see raw response)' : undefined,
+    },
+    timestamp: new Date().toISOString(),
+  };
+
   // Handle both legacy and new response formats
   const response: GenerateVibeResponse = {
     thought: data.thought || '',
+    debugInfo,
   };
 
   // New multi-file format

@@ -38,5 +38,20 @@ export interface GenerateVibeResponse {
   files?: FileOperation[];  // New multi-file format
   message?: string;    // Optional message for chat
   dependencies?: Record<string, string>;  // NPM packages to add
+  debugInfo?: DebugInfo;  // Debug information for panel
 }
 
+export interface DebugInfo {
+  systemPrompt?: string;
+  userPrompt?: string;
+  rawResponse?: string;
+  parsedResponse?: {
+    thought?: string;
+    message?: string;
+    files?: Array<{ path: string; action: string }>;
+    html?: string;
+  };
+  error?: string;
+  timestamp?: string;
+  duration?: number;
+}

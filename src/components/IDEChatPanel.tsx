@@ -12,8 +12,10 @@ import {
     ChevronDown,
     ChevronUp,
     MessageSquare,
-    ArrowUp
+    ArrowUp,
+    Bug
 } from 'lucide-react';
+import { DebugPanel, DebugInfo } from './DebugPanel';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { templates } from '@/templates/projectTemplates';
@@ -44,6 +46,8 @@ export function IDEChatPanel() {
     const [isLoadingIdea, setIsLoadingIdea] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
+    const [showDebug, setShowDebug] = useState(false);
+    const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,7 +90,23 @@ export function IDEChatPanel() {
             }));
 
             const projectFiles = Array.from(files.values());
+            const startTime = Date.now();
             const result = await generateVibe(userInput, history, projectFiles);
+            const duration = Date.now() - startTime;
+
+            // Capture debug info
+            setDebugInfo({
+                userPrompt: userInput,
+                rawResponse: result.debugInfo?.rawResponse,
+                parsedResponse: {
+                    thought: result.thought,
+                    message: result.message,
+                    files: result.files?.map(f => ({ path: f.path, action: f.action })),
+                    html: result.html ? 'HTML content present' : undefined,
+                },
+                timestamp: new Date().toISOString(),
+                duration,
+            });
 
             addMessage({
                 role: 'assistant',
@@ -100,6 +120,10 @@ export function IDEChatPanel() {
             }
         } catch (error) {
             console.error('Error generating:', error);
+            setDebugInfo(prev => ({
+                ...prev,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            }));
             addMessage({
                 role: 'assistant',
                 content: 'Sorry, there was an error generating your code. Please try again.',
@@ -450,6 +474,19 @@ export function IDEChatPanel() {
                                     <Dices className="w-4 h-4" />
                                 )}
                             </button>
+                            {/* Debug toggle */}
+                            <button
+                                onClick={() => setShowDebug(!showDebug)}
+                                className={cn(
+                                    'p-2 rounded-lg transition-colors',
+                                    showDebug
+                                        ? 'bg-yellow-500/20 text-yellow-400'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                )}
+                                title="Toggle Debug Panel"
+                            >
+                                <Bug className="w-4 h-4" />
+                            </button>
                         </div>
 
                         {/* Right side actions */}
@@ -476,6 +513,15 @@ export function IDEChatPanel() {
                         </div>
                     </div>
                 </div>
+
+                {/* Debug Panel */}
+                {showDebug && (
+                    <DebugPanel
+                        debugInfo={debugInfo}
+                        isVisible={showDebug}
+                        onToggle={() => setShowDebug(false)}
+                    />
+                )}
             </div>
         </div>
     );
