@@ -23,7 +23,7 @@ import { useActivityStore } from '@/stores/useActivityStore';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { templates } from '@/templates/projectTemplates';
-import { generateVibe, generateRandomIdea } from '@/services/geminiService';
+import { generateVibe, generateVibeStream, generateRandomIdea } from '@/services/geminiService';
 import { ConversationMessage } from '@/types/projectTypes';
 
 interface Attachment {
@@ -35,6 +35,7 @@ interface Attachment {
 }
 
 const MAX_AUTO_RETRIES = 2;
+const RETRY_COOLDOWN_MS = 30000; // 30 second cooldown after max retries
 
 export function IDEChatPanel() {
     const {
@@ -67,6 +68,8 @@ export function IDEChatPanel() {
     const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
     const [showActivity, setShowActivity] = useState(false);
     const [autoRetryCount, setAutoRetryCount] = useState(0);
+    const [lastErrorHash, setLastErrorHash] = useState<string | null>(null);
+    const [retryCooldownUntil, setRetryCooldownUntil] = useState<number>(0);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,20 +91,40 @@ export function IDEChatPanel() {
         }
     }, [input]);
 
-    // Auto error recovery loop
+    // Auto error recovery loop - with improved loop prevention
     useEffect(() => {
-        if (sandpackError && !isGenerating && autoRetryCount < MAX_AUTO_RETRIES) {
+        // Don't retry if currently generating or in cooldown
+        const now = Date.now();
+        if (!sandpackError || isGenerating || now < retryCooldownUntil) {
+            return;
+        }
+
+        // Create a hash of the error to detect if it's the same error repeating
+        const errorHash = sandpackError.slice(0, 100);
+
+        // If it's a different error, reset the counter
+        if (errorHash !== lastErrorHash) {
+            setLastErrorHash(errorHash);
+            setAutoRetryCount(0);
+        }
+
+        // Check if we can retry
+        if (autoRetryCount < MAX_AUTO_RETRIES) {
             const timer = setTimeout(() => {
                 setAutoRetryCount(prev => prev + 1);
                 handleFixError();
             }, 1500);
             return () => clearTimeout(timer);
+        } else {
+            // Max retries reached, enter cooldown
+            setRetryCooldownUntil(Date.now() + RETRY_COOLDOWN_MS);
         }
-        // Reset retry count when error is cleared
+        // Reset when error is cleared
         if (!sandpackError) {
             setAutoRetryCount(0);
+            setLastErrorHash(null);
         }
-    }, [sandpackError, isGenerating]);
+    }, [sandpackError, isGenerating, autoRetryCount, lastErrorHash, retryCooldownUntil]);
 
     const handleSend = useCallback(async () => {
         if (!input.trim() || isGenerating) return;
@@ -127,46 +150,81 @@ export function IDEChatPanel() {
             addReading(file.path.split('/').pop() || file.path);
         });
 
-        // Start thinking activity
-        const thinkingId = startThinking();
+        // Prepare history
+        const history = messages.map((m: ConversationMessage) => ({
+            role: m.role,
+            content: m.content,
+        }));
+
+        let thinkingId: string | null = null;
+        let thought = '';
+        let message = '';
+        let resultFiles: any[] = [];
 
         try {
-            const history = messages.map((m: ConversationMessage) => ({
-                role: m.role,
-                content: m.content,
-            }));
+            // Use streaming generator
+            for await (const event of generateVibeStream(userInput, history, projectFiles)) {
+                switch (event.type) {
+                    case 'thinking':
+                        thinkingId = startThinking();
+                        break;
 
-            const result = await generateVibe(userInput, history, projectFiles);
+                    case 'token':
+                        // Token received - update activity with progress
+                        if (event.total && event.total % 500 === 0) {
+                            // Update thinking activity periodically to show progress
+                            console.log(`Streaming: ${event.total} chars received`);
+                        }
+                        break;
 
-            // Stop thinking timer
-            stopThinking(thinkingId);
+                    case 'done':
+                        // Stream complete - process final result
+                        if (thinkingId) {
+                            stopThinking(thinkingId);
+                        }
 
-            // Add AI's explanation
-            if (result.thought) {
-                addExplaining(result.thought.slice(0, 100) + (result.thought.length > 100 ? '...' : ''));
-            }
+                        thought = event.thought || '';
+                        message = event.message || 'Generated successfully';
+                        resultFiles = event.files || [];
 
-            // Add file operations to activity stream
-            if (result.files && result.files.length > 0) {
-                result.files.forEach(file => {
-                    const fileName = file.path.split('/').pop() || file.path;
-                    addEditing(fileName, file.action);
-                });
-            }
+                        // Add AI's explanation
+                        if (thought) {
+                            addExplaining(thought.slice(0, 100) + (thought.length > 100 ? '...' : ''));
+                        }
 
-            addMessage({
-                role: 'assistant',
-                content: result.message || `I've made changes to the project. Check the preview!`,
-                thought: result.thought,
-                fileOperations: result.files,
-            });
+                        // Add file operations to activity stream
+                        if (resultFiles.length > 0) {
+                            resultFiles.forEach(file => {
+                                const fileName = file.path.split('/').pop() || file.path;
+                                addEditing(fileName, file.action);
+                            });
+                        }
 
-            if (result.files && result.files.length > 0) {
-                applyFileOperations(result.files);
+                        addMessage({
+                            role: 'assistant',
+                            content: message,
+                            thought: thought,
+                            fileOperations: resultFiles,
+                        });
+
+                        if (resultFiles.length > 0) {
+                            applyFileOperations(resultFiles);
+                        }
+                        break;
+
+                    case 'error':
+                        if (thinkingId) {
+                            stopThinking(thinkingId);
+                        }
+                        addError(event.error || 'Unknown error');
+                        throw new Error(event.error || 'Streaming error');
+                }
             }
         } catch (error) {
             console.error('Error generating:', error);
-            stopThinking(thinkingId);
+            if (thinkingId) {
+                stopThinking(thinkingId);
+            }
             addError(error instanceof Error ? error.message : 'Unknown error');
             addMessage({
                 role: 'assistant',

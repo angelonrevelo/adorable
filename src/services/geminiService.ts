@@ -7,6 +7,110 @@ interface HistoryMessage {
   content: string;
 }
 
+// SSE Stream event types
+export type StreamEventType = 'thinking' | 'token' | 'files' | 'done' | 'error';
+
+export interface StreamEvent {
+  type: StreamEventType;
+  text?: string;
+  total?: number;
+  thought?: string;
+  message?: string;
+  files?: FileOperation[];
+  error?: string;
+}
+
+// Streaming generator function for SSE
+export async function* generateVibeStream(
+  prompt: string,
+  history: HistoryMessage[],
+  projectFiles?: ProjectFile[]
+): AsyncGenerator<StreamEvent> {
+  // Format project files as context
+  const filesContext = projectFiles?.map(f => ({
+    path: f.path,
+    content: f.content.length > 50000 ? f.content.slice(0, 50000) : f.content,
+  }));
+
+  // Get the Supabase URL from env
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('Supabase env vars missing:', { supabaseUrl: !!supabaseUrl, supabaseKey: !!supabaseKey });
+    yield { type: 'error', error: 'Supabase configuration missing' };
+    return;
+  }
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/generate-vibe`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        prompt,
+        history: history.map(m => ({ role: m.role, content: m.content })),
+        projectFiles: filesContext,
+        type: 'generate-stream'
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      yield { type: 'error', error: errorText };
+      return;
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      yield { type: 'error', error: 'No response body' };
+      return;
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE messages
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const event = JSON.parse(line.slice(6)) as StreamEvent;
+            yield event;
+          } catch (e) {
+            console.error('Failed to parse SSE event:', line);
+          }
+        }
+      }
+    }
+
+    // Process any remaining buffer
+    if (buffer.startsWith('data: ')) {
+      try {
+        const event = JSON.parse(buffer.slice(6)) as StreamEvent;
+        yield event;
+      } catch (e) {
+        console.error('Failed to parse final SSE event:', buffer);
+      }
+    }
+  } catch (error) {
+    yield {
+      type: 'error',
+      error: error instanceof Error ? error.message : 'Network error'
+    };
+  }
+}
+
 export async function generateVibe(
   prompt: string,
   history: HistoryMessage[],

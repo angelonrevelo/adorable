@@ -125,6 +125,209 @@ serve(async (req) => {
 
     const model = "gemini-2.0-flash-001"; // Fast model to avoid timeout
 
+    // =====================
+    // STREAMING HANDLER (SSE)
+    // =====================
+    if (type === "generate-stream") {
+      console.log("Starting SSE streaming response");
+
+      // Build conversation history
+      const conversationHistory =
+        history?.map((msg: { role: string; content: string }) => ({
+          role: msg.role === "assistant" ? "model" : "user",
+          parts: [{ text: msg.content }],
+        })) || [];
+
+      // Build context with files
+      let contextMessage = `
+=== CRITICAL RULES ===
+1. MODIFY, DON'T REPLACE existing code
+2. PRESERVE existing design and structure
+3. ADD new features without removing existing ones
+
+=== TECH STACK ===
+React 18 + TypeScript + Tailwind CSS
+
+=== OUTPUT FORMAT ===
+Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "...", "content": "...", "action": "create|modify|delete"}]}
+
+=== CURRENT CODE ===
+`;
+
+      if (projectFiles && projectFiles.length > 0) {
+        for (const file of projectFiles) {
+          contextMessage += `\n--- ${file.path} ---\n${file.content}\n`;
+        }
+      }
+
+      contextMessage += `\n=== USER REQUEST ===\n${prompt}`;
+
+      const messages = [
+        ...conversationHistory,
+        { role: "user", parts: [{ text: contextMessage }] },
+      ];
+
+      // Create SSE stream
+      const stream = new ReadableStream({
+        async start(controller) {
+          const encoder = new TextEncoder();
+
+          // Send initial "thinking" event
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "thinking" })}\n\n`));
+
+          try {
+            // Call Gemini streaming API
+            const response = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${GEMINI_API_KEY}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  contents: messages,
+                  systemInstruction: { parts: [{ text: multiFileSystemPrompt }] },
+                  generationConfig: {
+                    temperature: 0.7,
+                    maxOutputTokens: 32768,
+                  },
+                }),
+              }
+            );
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error("Gemini streaming error:", response.status, errorText);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: errorText })}\n\n`));
+              controller.close();
+              return;
+            }
+
+            const reader = response.body!.getReader();
+            let rawChunks = "";
+
+            // Just accumulate all chunks - Gemini sends complete JSON objects per chunk
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              rawChunks += new TextDecoder().decode(value);
+            }
+
+            console.log("Stream complete, raw chunks length:", rawChunks.length);
+
+            // Gemini streaming returns JSON array: [{"candidates":[...]},{"candidates":[...]}]
+            // Each element contains a partial text response
+            let fullText = "";
+            try {
+              // The response is a JSON array of objects
+              const parsed = JSON.parse(rawChunks);
+              if (Array.isArray(parsed)) {
+                for (const item of parsed) {
+                  const text = item.candidates?.[0]?.content?.parts?.[0]?.text;
+                  if (text) {
+                    fullText += text;
+                  }
+                }
+              } else if (parsed.candidates) {
+                // Single object response
+                fullText = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+              }
+            } catch {
+              // If not valid JSON array, try to extract text from raw chunks
+              console.log("Raw parsing failed, trying regex extraction");
+              const textMatches = rawChunks.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g);
+              if (textMatches) {
+                for (const match of textMatches) {
+                  const textValue = match.match(/"text"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1];
+                  if (textValue) {
+                    // Unescape the JSON string
+                    fullText += JSON.parse(`"${textValue}"`);
+                  }
+                }
+              }
+            }
+
+            console.log("Extracted text length:", fullText.length);
+            console.log("First 500 chars:", fullText.slice(0, 500));
+
+            // Send token event with accumulated text
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              type: "token",
+              total: fullText.length
+            })}\n\n`));
+
+            // Now parse the AI's JSON response from fullText
+            let aiResponse;
+            try {
+              const jsonStart = fullText.indexOf('{');
+              const jsonEnd = fullText.lastIndexOf('}');
+
+              if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+                const jsonStr = fullText.slice(jsonStart, jsonEnd + 1);
+                aiResponse = JSON.parse(jsonStr);
+              } else {
+                console.error("No JSON object found in AI response");
+                throw new Error("No JSON found in AI response");
+              }
+            } catch (e) {
+              console.error("Failed to parse AI response:", e);
+              console.error("Full text was:", fullText.slice(0, 2000));
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: "error",
+                message: "Failed to parse AI response"
+              })}\n\n`));
+              controller.close();
+              return;
+            }
+
+            // Apply self-fixing for JSX issues
+            if (aiResponse.files && Array.isArray(aiResponse.files)) {
+              aiResponse.files = aiResponse.files.map((file: { path: string; content: string; action: string }) => {
+                if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
+                  let fixedContent = file.content;
+                  // Strip markdown code blocks
+                  fixedContent = fixedContent
+                    .replace(/^```(?:tsx|typescript|jsx|ts|js|javascript)?\n?/gm, '')
+                    .replace(/\n?```$/gm, '')
+                    .trim();
+                  // Fix HTML comments to JSX
+                  fixedContent = fixedContent.replace(/<!--\s*([\s\S]*?)\s*-->/g, '{/* $1 */}');
+                  // Fix class= to className=
+                  fixedContent = fixedContent.replace(/\bclass=/g, 'className=');
+                  return { ...file, content: fixedContent };
+                }
+                return file;
+              });
+            }
+
+            // Send the final "done" event with parsed data
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              type: "done",
+              thought: aiResponse.thought || "",
+              message: aiResponse.message || "Generated successfully",
+              files: aiResponse.files || []
+            })}\n\n`));
+
+            controller.close();
+          } catch (error) {
+            console.error("Streaming error:", error);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+              type: "error",
+              message: error instanceof Error ? error.message : "Unknown error"
+            })}\n\n`));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
     let messages;
     let systemInstruction;
 
