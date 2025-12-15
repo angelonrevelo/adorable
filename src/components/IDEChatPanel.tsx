@@ -1,10 +1,32 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Dices, Sparkles, Loader2, Plus, FolderPlus } from 'lucide-react';
+import {
+    Send,
+    Dices,
+    Sparkles,
+    Loader2,
+    Plus,
+    FolderPlus,
+    Paperclip,
+    Image as ImageIcon,
+    X,
+    ChevronDown,
+    ChevronUp,
+    MessageSquare,
+    ArrowUp
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { templates } from '@/templates/projectTemplates';
 import { generateVibe, generateRandomIdea } from '@/services/geminiService';
 import { ConversationMessage } from '@/types/projectTypes';
+
+interface Attachment {
+    id: string;
+    type: 'image' | 'file';
+    name: string;
+    preview?: string;
+    file: File;
+}
 
 export function IDEChatPanel() {
     const {
@@ -20,8 +42,11 @@ export function IDEChatPanel() {
 
     const [input, setInput] = useState('');
     const [isLoadingIdea, setIsLoadingIdea] = useState(false);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,13 +56,22 @@ export function IDEChatPanel() {
         scrollToBottom();
     }, [messages]);
 
+    // Auto-resize textarea
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+        }
+    }, [input]);
+
     const handleSend = useCallback(async () => {
         if (!input.trim() || isGenerating) return;
 
         const userInput = input.trim();
         setInput('');
+        setAttachments([]);
 
-        // Add user message
         addMessage({
             role: 'user',
             content: userInput,
@@ -46,18 +80,14 @@ export function IDEChatPanel() {
         setGenerating(true);
 
         try {
-            // Build conversation history
             const history = messages.map((m: ConversationMessage) => ({
                 role: m.role,
                 content: m.content,
             }));
 
-            // Get current project files for context
             const projectFiles = Array.from(files.values());
-
             const result = await generateVibe(userInput, history, projectFiles);
 
-            // Add assistant message
             addMessage({
                 role: 'assistant',
                 content: result.message || `I've made changes to the project. Check the preview!`,
@@ -65,11 +95,9 @@ export function IDEChatPanel() {
                 fileOperations: result.files,
             });
 
-            // Apply file operations
             if (result.files && result.files.length > 0) {
                 applyFileOperations(result.files);
             }
-
         } catch (error) {
             console.error('Error generating:', error);
             addMessage({
@@ -100,6 +128,59 @@ export function IDEChatPanel() {
         } finally {
             setIsLoadingIdea(false);
         }
+    };
+
+    const handleAttachmentClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = e.target.files;
+        if (!selectedFiles) return;
+
+        const newAttachments: Attachment[] = [];
+        Array.from(selectedFiles).forEach(file => {
+            const isImage = file.type.startsWith('image/');
+            const attachment: Attachment = {
+                id: `${Date.now()}-${file.name}`,
+                type: isImage ? 'image' : 'file',
+                name: file.name,
+                file,
+            };
+
+            if (isImage) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    setAttachments(prev => prev.map(a =>
+                        a.id === attachment.id
+                            ? { ...a, preview: event.target?.result as string }
+                            : a
+                    ));
+                };
+                reader.readAsDataURL(file);
+            }
+
+            newAttachments.push(attachment);
+        });
+
+        setAttachments(prev => [...prev, ...newAttachments]);
+        e.target.value = '';
+    };
+
+    const removeAttachment = (id: string) => {
+        setAttachments(prev => prev.filter(a => a.id !== id));
+    };
+
+    const toggleThought = (messageId: string) => {
+        setExpandedThoughts(prev => {
+            const next = new Set(prev);
+            if (next.has(messageId)) {
+                next.delete(messageId);
+            } else {
+                next.add(messageId);
+            }
+            return next;
+        });
     };
 
     const handleCreateProject = (templateId: string) => {
@@ -161,12 +242,10 @@ export function IDEChatPanel() {
     return (
         <div className="flex flex-col h-full bg-[#0d0d12]">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/5">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-400" />
-                        <h1 className="font-semibold text-white">Hatable</h1>
-                    </div>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-purple-400" />
+                    <h1 className="font-semibold text-white">Hatable</h1>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500 truncate max-w-[120px]">
@@ -176,15 +255,15 @@ export function IDEChatPanel() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
                 {messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full space-y-4 animate-fade-in">
-                        <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center">
-                            <Sparkles className="w-6 h-6 text-purple-400" />
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/10 flex items-center justify-center">
+                            <Sparkles className="w-7 h-7 text-purple-400" />
                         </div>
-                        <div className="text-center space-y-1">
-                            <h2 className="text-sm font-medium text-white">Ready to build</h2>
-                            <p className="text-xs text-gray-500 max-w-[200px]">
+                        <div className="text-center space-y-2">
+                            <h2 className="text-base font-medium text-white">Ready to build</h2>
+                            <p className="text-sm text-gray-500 max-w-[220px] leading-relaxed">
                                 Describe what you want to create and I'll generate the code.
                             </p>
                         </div>
@@ -200,35 +279,58 @@ export function IDEChatPanel() {
                                 )}
                             >
                                 {message.role === 'user' ? (
-                                    <div className="max-w-[85%] bg-purple-500/20 border border-purple-500/30 rounded-lg px-3 py-2">
-                                        <p className="text-sm text-white">{message.content}</p>
+                                    <div className="max-w-[85%] bg-purple-600/90 rounded-2xl rounded-br-md px-4 py-2.5 shadow-lg">
+                                        <p className="text-sm text-white leading-relaxed">{message.content}</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
+                                        {/* Thought Block - Collapsible */}
                                         {message.thought && (
-                                            <div className="bg-[#111118] border border-white/5 rounded-lg px-3 py-2">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                                                    <span className="text-xs font-mono text-cyan-400 uppercase tracking-wider">
-                                                        Thinking
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-gray-400 whitespace-pre-wrap">{message.thought}</p>
+                                            <div className="bg-[#13131a] border border-white/5 rounded-xl overflow-hidden">
+                                                <button
+                                                    onClick={() => toggleThought(message.id)}
+                                                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                                        <span className="text-xs font-medium text-cyan-400 uppercase tracking-wider">
+                                                            Thinking
+                                                        </span>
+                                                    </div>
+                                                    {expandedThoughts.has(message.id) ? (
+                                                        <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                                                    ) : (
+                                                        <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                                                    )}
+                                                </button>
+                                                {expandedThoughts.has(message.id) && (
+                                                    <div className="px-3 pb-3">
+                                                        <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">
+                                                            {message.thought}
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
-                                        <div className="bg-[#111118] border border-white/5 rounded-lg px-3 py-2">
-                                            <p className="text-sm text-white whitespace-pre-wrap">{message.content}</p>
+
+                                        {/* Main Message */}
+                                        <div className="bg-[#16161e] border border-white/5 rounded-2xl rounded-tl-md px-4 py-3">
+                                            <p className="text-sm text-gray-100 whitespace-pre-wrap leading-relaxed">
+                                                {message.content}
+                                            </p>
                                         </div>
+
+                                        {/* File Operations */}
                                         {message.fileOperations && message.fileOperations.length > 0 && (
-                                            <div className="flex flex-wrap gap-1">
+                                            <div className="flex flex-wrap gap-1.5">
                                                 {message.fileOperations.map((op, i) => (
                                                     <span
                                                         key={i}
                                                         className={cn(
-                                                            'px-2 py-0.5 text-xs rounded',
-                                                            op.action === 'create' && 'bg-green-500/20 text-green-400',
-                                                            op.action === 'modify' && 'bg-blue-500/20 text-blue-400',
-                                                            op.action === 'delete' && 'bg-red-500/20 text-red-400'
+                                                            'inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg font-medium',
+                                                            op.action === 'create' && 'bg-green-500/15 text-green-400 border border-green-500/20',
+                                                            op.action === 'modify' && 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
+                                                            op.action === 'delete' && 'bg-red-500/15 text-red-400 border border-red-500/20'
                                                         )}
                                                     >
                                                         {op.action}: {op.path.split('/').pop()}
@@ -240,10 +342,18 @@ export function IDEChatPanel() {
                                 )}
                             </div>
                         ))}
+
+                        {/* Generating Indicator */}
                         {isGenerating && (
-                            <div className="flex items-center gap-2 text-gray-400 animate-fade-in">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span className="text-sm">Generating code...</span>
+                            <div className="flex items-center gap-3 animate-fade-in">
+                                <div className="flex items-center gap-2 px-3 py-2 bg-[#16161e] rounded-xl border border-white/5">
+                                    <div className="flex gap-1">
+                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                    <span className="text-sm text-gray-400">Generating...</span>
+                                </div>
                             </div>
                         )}
                         <div ref={messagesEndRef} />
@@ -251,42 +361,119 @@ export function IDEChatPanel() {
                 )}
             </div>
 
-            {/* Input Area */}
+            {/* Input Area - Modern Design */}
             <div className="p-3 border-t border-white/5">
-                <div className="relative rounded-lg border border-white/10 bg-[#111118] focus-within:border-purple-500/50 transition-all">
+                {/* Hidden file input */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.txt,.json,.md"
+                    onChange={handleFileChange}
+                    className="hidden"
+                />
+
+                {/* Attachment Previews */}
+                {attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                        {attachments.map((att) => (
+                            <div
+                                key={att.id}
+                                className="relative group"
+                            >
+                                {att.type === 'image' && att.preview ? (
+                                    <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10">
+                                        <img
+                                            src={att.preview}
+                                            alt={att.name}
+                                            className="w-full h-full object-cover"
+                                        />
+                                        <button
+                                            onClick={() => removeAttachment(att.id)}
+                                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X className="w-3 h-3 text-white" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-[#1a1a24] rounded-lg border border-white/10">
+                                        <Paperclip className="w-4 h-4 text-gray-400" />
+                                        <span className="text-xs text-gray-300 max-w-[100px] truncate">{att.name}</span>
+                                        <button
+                                            onClick={() => removeAttachment(att.id)}
+                                            className="p-0.5 hover:bg-white/10 rounded transition-colors"
+                                        >
+                                            <X className="w-3 h-3 text-gray-400" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Main Input Container */}
+                <div className="relative rounded-2xl bg-[#16161e] border border-white/10 focus-within:border-purple-500/40 focus-within:shadow-[0_0_20px_rgba(139,92,246,0.1)] transition-all">
                     <textarea
                         ref={textareaRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Describe what you want to build..."
-                        className="w-full bg-transparent px-3 py-2.5 pr-20 text-sm text-white placeholder:text-gray-500 
-                       resize-none focus:outline-none min-h-[44px] max-h-[120px]"
+                        placeholder="Make changes, add features, ask for anything..."
+                        className="w-full bg-transparent px-4 py-3 pr-24 text-sm text-white placeholder:text-gray-500 
+                       resize-none focus:outline-none min-h-[48px] max-h-[200px] leading-relaxed"
                         rows={1}
                         disabled={isGenerating}
                     />
-                    <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                        <button
-                            onClick={handleDiceClick}
-                            disabled={isLoadingIdea || isGenerating}
-                            className="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition-colors 
-                         disabled:opacity-50"
-                            title="Random Idea"
-                        >
-                            {isLoadingIdea ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Dices className="w-4 h-4" />
-                            )}
-                        </button>
-                        <button
-                            onClick={handleSend}
-                            disabled={!input.trim() || isGenerating}
-                            className="p-1.5 bg-purple-600 text-white rounded hover:bg-purple-500 
-                         transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Send className="w-4 h-4" />
-                        </button>
+
+                    {/* Bottom Toolbar */}
+                    <div className="flex items-center justify-between px-2 pb-2">
+                        {/* Left side actions */}
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={handleAttachmentClick}
+                                disabled={isGenerating}
+                                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+                                title="Add attachment"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={handleDiceClick}
+                                disabled={isLoadingIdea || isGenerating}
+                                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
+                                title="Random idea"
+                            >
+                                {isLoadingIdea ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Dices className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Right side actions */}
+                        <div className="flex items-center gap-2">
+                            {/* Chat mode indicator */}
+                            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-purple-600/20 rounded-full">
+                                <MessageSquare className="w-3 h-3 text-purple-400" />
+                                <span className="text-xs font-medium text-purple-400">Chat</span>
+                            </div>
+
+                            {/* Send button */}
+                            <button
+                                onClick={handleSend}
+                                disabled={!input.trim() || isGenerating}
+                                className={cn(
+                                    "p-2 rounded-xl transition-all",
+                                    input.trim() && !isGenerating
+                                        ? "bg-purple-600 text-white hover:bg-purple-500 shadow-lg shadow-purple-500/25"
+                                        : "bg-white/5 text-gray-500 cursor-not-allowed"
+                                )}
+                            >
+                                <ArrowUp className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
