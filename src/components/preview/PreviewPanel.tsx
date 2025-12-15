@@ -245,6 +245,25 @@ export function PreviewPanel() {
                             '@radix-ui/react-switch': '^1.0.3',
                             'class-variance-authority': '^0.7.0',
                             'uuid': '^9.0.0',
+                            // State Management
+                            'zustand': '^4.4.0',
+                            // Validation
+                            'zod': '^3.22.0',
+                            // Data Fetching
+                            '@tanstack/react-query': '^5.0.0',
+                            // Notifications
+                            'sonner': '^1.0.0',
+                            // Forms
+                            'react-hook-form': '^7.48.0',
+                            // Drag & Drop
+                            '@dnd-kit/core': '^6.1.0',
+                            '@dnd-kit/sortable': '^7.0.0',
+                            // Additional Radix UI
+                            '@radix-ui/react-checkbox': '^1.0.4',
+                            '@radix-ui/react-select': '^2.0.0',
+                            '@radix-ui/react-slider': '^1.1.2',
+                            '@radix-ui/react-progress': '^1.0.3',
+                            '@radix-ui/react-avatar': '^1.0.4',
                         },
                         entry: '/src/main.tsx',
                     }}

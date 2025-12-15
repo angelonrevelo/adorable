@@ -184,22 +184,143 @@ serve(async (req) => {
 - Tailwind CSS (ALL classes available)
 - useState/useEffect for state
 
-=== AVAILABLE LIBRARIES (USE THESE!) ===
+=== COMPLETE LIBRARY REFERENCE ===
 
-ICONS (lucide-react):
-import { Plus, Trash, Edit, Search, Menu, X, Check, ChevronRight, User, Settings } from 'lucide-react';
-<Plus className="w-5 h-5" />
+✅ INSTALLED & READY TO USE:
 
-CHARTS (recharts):
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie } from 'recharts';
+UI COMPONENTS:
+- lucide-react: Icons (Plus, Trash2, Search, Menu, X, Check, ChevronRight, User, Settings, MapPin, Navigation, Building, etc.)
+  import { Plus, Trash2, Search } from 'lucide-react';
+  <Plus className="w-5 h-5" />
+  
+- @radix-ui/*: Headless UI primitives
+  Dialog, DropdownMenu, Tabs, Tooltip, Accordion, Switch, Checkbox, Select, Slider, Progress, Avatar
+  
+- class-variance-authority: Component variants
+  import { cva } from 'class-variance-authority';
+  
+- clsx + tailwind-merge: Conditional classes
+  import { clsx } from 'clsx';
 
-DATES (date-fns):
-import { format, parseISO, addDays, differenceInDays, isAfter, isBefore } from 'date-fns';
-format(new Date(), 'PPP') // "April 29, 2024"
+ANIMATION:
+- framer-motion: Motion components and animations
+  import { motion, AnimatePresence } from 'framer-motion';
+  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
 
-ANIMATION (framer-motion):
-import { motion, AnimatePresence } from 'framer-motion';
-<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+CHARTS:
+- recharts: Data visualization
+  import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, AreaChart, Area } from 'recharts';
+
+DATES:
+- date-fns: Date formatting and manipulation
+  import { format, parseISO, addDays, differenceInDays, isAfter, isBefore, formatDistanceToNow } from 'date-fns';
+  format(new Date(), 'PPP') // "April 29, 2024"
+
+STATE MANAGEMENT:
+- zustand: Simple global state
+  import { create } from 'zustand';
+  const useStore = create((set) => ({ count: 0, inc: () => set((s) => ({ count: s.count + 1 })) }));
+
+VALIDATION:
+- zod: Schema validation
+  import { z } from 'zod';
+  const schema = z.object({ email: z.string().email(), age: z.number().min(0) });
+
+DATA FETCHING:
+- @tanstack/react-query: Server state management
+  import { useQuery, useMutation, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+FORMS:
+- react-hook-form: Form handling
+  import { useForm } from 'react-hook-form';
+  const { register, handleSubmit, formState } = useForm();
+
+NOTIFICATIONS:
+- sonner: Toast notifications
+  import { toast, Toaster } from 'sonner';
+  toast('Hello!'); toast.success('Success!'); toast.error('Error!');
+
+DRAG & DROP:
+- @dnd-kit/core: Drag and drop
+  import { DndContext, useDraggable, useDroppable } from '@dnd-kit/core';
+- @dnd-kit/sortable: Sortable lists
+  import { SortableContext, useSortable } from '@dnd-kit/sortable';
+
+UTILS:
+- uuid: Unique IDs
+  import { v4 as uuidv4 } from 'uuid';
+
+❌ NOT INSTALLED - DO NOT USE (WILL CAUSE ERRORS):
+
+MAPS (use OpenStreetMap iframe instead):
+- leaflet, react-leaflet ❌
+- mapbox-gl, react-map-gl ❌
+- google-maps-react, @react-google-maps/api ❌
+
+HTTP (use native fetch instead):
+- axios ❌
+
+DATES (use date-fns instead):
+- moment ❌
+- dayjs ❌
+
+STATE (use zustand or useState instead):
+- redux, @reduxjs/toolkit ❌
+- mobx ❌
+- recoil, jotai ❌
+
+STYLING (use Tailwind CSS instead):
+- styled-components ❌
+- @emotion/react, @emotion/styled ❌
+
+ANIMATION (use framer-motion instead):
+- gsap ❌
+- anime.js ❌
+- react-spring ❌
+
+FORMS (use react-hook-form instead):
+- formik ❌
+
+=== SMART ALTERNATIVES ===
+
+When user asks for... → Use this:
+- "Add a map" → OpenStreetMap iframe (see MAPS section below)
+- "Make API call" → Native fetch with async/await
+- "Add notifications" → sonner toast()
+- "Add drag and drop" → @dnd-kit/core
+- "Form validation" → zod + react-hook-form
+- "Global state" → zustand
+- "Data caching" → @tanstack/react-query
+
+=== MAPS (NO LIBRARY NEEDED!) ===
+
+For ANY map request, use OpenStreetMap iframe embed:
+
+<iframe
+  src="https://www.openstreetmap.org/export/embed.html?bbox=120.9,14.4,121.2,14.8&layer=mapnik"
+  className="w-full h-[400px] rounded-xl border-0"
+  title="Map"
+/>
+
+Common bbox coordinates:
+- Metro Manila: bbox=120.9,14.4,121.2,14.8
+- New York: bbox=-74.1,40.6,-73.8,40.9
+- London: bbox=-0.2,51.4,0.1,51.6
+- San Francisco: bbox=-122.5,37.7,-122.3,37.85
+
+For markers, append: ?mlat={lat}&mlon={lon}
+
+=== IMAGES ===
+
+NEVER use external image URLs from imgur, i.imgur.com, or random hosts (they will break!).
+
+For placeholder images, use:
+- https://picsum.photos/800/600 (random photo)
+- https://picsum.photos/seed/nature/800/600 (seeded photo - consistent)
+- https://placehold.co/800x600/1e293b/8b5cf6?text=Placeholder (colored placeholder)
+
+For icons, use lucide-react instead of images:
+import { MapPin, Navigation, Building, Image, Camera } from 'lucide-react';
 
 === TYPESCRIPT RULES (REQUIRED) ===
 
