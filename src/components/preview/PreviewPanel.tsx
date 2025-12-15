@@ -168,6 +168,7 @@ export function PreviewPanel() {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
     <div id="root"></div>
@@ -209,12 +210,14 @@ export function PreviewPanel() {
                         autoReload: true,
                         recompileMode: 'delayed',
                         recompileDelay: 500,
+                        externalResources: [
+                            "https://cdn.tailwindcss.com",
+                        ],
                     }}
                     customSetup={{
                         dependencies: {
                             'react': '^18.2.0',
                             'react-dom': '^18.2.0',
-                            'react-router-dom': '^6.20.0',
                             'lucide-react': '^0.294.0',
                         },
                         entry: '/src/main.tsx',
