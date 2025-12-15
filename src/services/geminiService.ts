@@ -135,10 +135,23 @@ export async function generateVibe(
 
   if (error) {
     console.error('Error calling generate-vibe:', error);
-    throw new Error(error.message || 'Failed to generate vibe');
+    
+    // Better error messages for common issues
+    const errorMsg = error.message || '';
+    if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError') || errorMsg.includes('network')) {
+      throw new Error('Network error - please check your internet connection and try again');
+    }
+    if (errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
+      throw new Error('Request timed out - the server may be busy, please try again');
+    }
+    if (errorMsg.includes('GEMINI_API_KEY') || errorMsg.includes('API key')) {
+      throw new Error('AI service not configured - please check the GEMINI_API_KEY in Supabase secrets');
+    }
+    
+    throw new Error(error.message || 'Failed to generate code');
   }
 
-  if (data.error) {
+  if (data?.error) {
     console.error('API error:', data.error);
     throw new Error(data.error);
   }

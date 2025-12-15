@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { X, FileCode, FileJson, FileType, File } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
@@ -23,7 +24,7 @@ function getFileIcon(path: string) {
     }
 }
 
-export function EditorTabs() {
+export const EditorTabs = forwardRef<HTMLDivElement>((_, ref) => {
     const { openFiles, activeFile, setActiveFile, closeFile } = useProjectStore();
 
     if (openFiles.length === 0) {
@@ -31,7 +32,7 @@ export function EditorTabs() {
     }
 
     return (
-        <div className="flex items-center bg-[#111118] border-b border-white/5 overflow-x-auto scrollbar-thin">
+        <div ref={ref} className="flex items-center bg-[#111118] border-b border-white/5 overflow-x-auto scrollbar-thin">
             {openFiles.map((path) => {
                 const fileName = path.split('/').pop() || path;
                 const isActive = path === activeFile;
@@ -66,4 +67,6 @@ export function EditorTabs() {
             })}
         </div>
     );
-}
+});
+
+EditorTabs.displayName = 'EditorTabs';
