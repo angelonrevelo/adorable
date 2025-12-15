@@ -198,7 +198,7 @@ export function IDEChatPanel() {
                 <div className="flex items-center gap-3 p-4 border-b border-white/5">
                     <div className="flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-yellow-400" />
-                        <h1 className="font-semibold text-white">Killable</h1>
+                        <h1 className="font-semibold text-white">Adorable</h1>
                     </div>
                     <span className="text-xs font-mono text-gray-500 uppercase tracking-wider">
                         AI IDE
@@ -245,7 +245,7 @@ export function IDEChatPanel() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-yellow-400" />
-                    <h1 className="font-semibold text-white">Killable</h1>
+                    <h1 className="font-semibold text-white">Adorable</h1>
                 </div>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500 truncate max-w-[120px]">

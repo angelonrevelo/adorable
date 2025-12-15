@@ -28,7 +28,7 @@ OUTPUT FORMAT - Respond ONLY with valid JSON:
 }`;
 
 // Lovable-style multi-file React prompt with chain-of-thought
-const multiFileSystemPrompt = `You are an expert full-stack React developer and UI/UX designer like the team at Lovable.dev.
+const multiFileSystemPrompt = `You are an expert full-stack React developer and UI/UX designer like the team at Adorable.
 You generate COMPLETE, PRODUCTION-QUALITY, BEAUTIFULLY STYLED multi-file React applications.
 
 === YOUR APPROACH ===
@@ -125,7 +125,7 @@ Your response MUST be valid JSON with this exact structure:
 
 === CRITICAL RULES ===
 
-1. The "thought" field should be detailed like Lovable's - list features, design decisions, files
+1. The "thought" field should be detailed like Adorable's - list features, design decisions, files
 2. Generate MULTIPLE files for any non-trivial app (5-10 files)
 3. Use Tailwind classes, NOT inline styles
 4. Every component must be fully styled and functional

@@ -75,7 +75,7 @@ export function ChatPanel({ messages, onSendMessage, onRandomIdea, isGenerating 
       <div className="flex items-center gap-3 p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-primary" />
-          <h1 className="font-semibold text-foreground">Hatable</h1>
+          <h1 className="font-semibold text-foreground">Adorable</h1>
         </div>
         <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
           AI Prototype Engine
@@ -174,7 +174,7 @@ export function ChatPanel({ messages, onSendMessage, onRandomIdea, isGenerating 
             </button>
           ))}
         </div>
-        
+
         <div className="relative input-glow rounded-lg border border-border bg-surface-2 focus-within:border-primary/50 transition-all">
           <textarea
             ref={textareaRef}

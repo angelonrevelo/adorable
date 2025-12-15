@@ -66,14 +66,14 @@ export function ProjectDashboard({ onProjectSelect, onNewProject }: ProjectDashb
     }, []);
 
     const checkAuth = async () => {
-        const user = await ProjectService.getCurrentUser();
+        const { data: { user } } = await supabase.auth.getUser();
         setIsAuthenticated(!!user);
         setUserEmail(user?.email || null);
     };
 
     const loadProjects = async () => {
         setIsLoading(true);
-        const projectList = await ProjectService.listProjects();
+        const projectList = await ProjectService.getUserProjects();
         setProjects(projectList);
         setIsLoading(false);
     };
@@ -136,8 +136,8 @@ export function ProjectDashboard({ onProjectSelect, onNewProject }: ProjectDashb
                             <Sparkles className="w-5 h-5 text-purple-400" />
                         </div>
                         <div>
-                            <h1 className="font-semibold text-lg">Hatable</h1>
-                            <p className="text-xs text-gray-500">AI IDE</p>
+                            <h1 className="text-xl font-semibold text-white">Adorable</h1>
+                            <span className="text-xs font-mono text-gray-500">Adorable AI</span>
                         </div>
                     </div>
 
