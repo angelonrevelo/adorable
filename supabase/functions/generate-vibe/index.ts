@@ -36,14 +36,13 @@ Your job is to create or modify files to fulfill the user's request.
 
 TECH STACK:
 • React 18 with TypeScript
-• Vite for bundling
-• Tailwind CSS (available via classes)
+• Vite for bundling  
+• CSS (use inline styles OR create .css files - see rules below)
 • No external UI libraries unless specified
 
 CODING STANDARDS:
 • Use functional components with hooks
 • Use TypeScript with proper types
-• Use Tailwind classes for styling
 • Keep components focused and modular
 • Use meaningful variable/function names
 
@@ -53,6 +52,20 @@ DESIGN GUIDELINES:
 • Modern, clean aesthetics
 • Responsive design (mobile-first)
 • Smooth transitions and hover states
+
+FOR GAMES/CANVAS APPS:
+• Use HTML5 Canvas with useRef and useEffect
+• Use requestAnimationFrame for game loops
+• Put ALL styles inline in the component (no separate CSS files)
+• Include: Start screen, gameplay, game over with score
+• Add keyboard AND touch/click controls
+• Example canvas setup:
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    // game loop here
+  }, []);
 
 FILE NAMING:
 • Components: PascalCase (e.g., UserProfile.tsx)
@@ -69,11 +82,6 @@ OUTPUT FORMAT - Respond ONLY with valid JSON:
       "path": "src/components/Example.tsx",
       "content": "// Full file content here",
       "action": "create"
-    },
-    {
-      "path": "src/App.tsx",
-      "content": "// Modified App.tsx content",
-      "action": "modify"
     }
   ],
   "dependencies": {
@@ -81,12 +89,15 @@ OUTPUT FORMAT - Respond ONLY with valid JSON:
   }
 }
 
-RULES:
-1. Always output complete file contents, not partial updates
-2. For modifications, output the ENTIRE new file content
-3. Use "action": "create" for new files, "modify" for existing
-4. Keep thought concise
-5. Only include dependencies if actually needed`;
+CRITICAL RULES:
+1. If you import a CSS file (e.g., import './App.css'), you MUST include that CSS file in your files array
+2. For games/canvas: Use INLINE STYLES only - do NOT import CSS files
+3. Always output complete file contents, not partial updates
+4. For modifications, output the ENTIRE new file content
+5. Use "action": "create" for new files, "modify" for existing
+6. Keep thought concise
+7. Only include dependencies if actually needed
+8. For App.tsx modifications: Keep the existing imports if they work, only modify what's needed`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {

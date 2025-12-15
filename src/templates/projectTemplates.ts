@@ -1,20 +1,20 @@
 import { ProjectTemplate } from '@/types/projectTypes';
 
 export const reactTemplate: ProjectTemplate = {
-    id: 'react-starter',
-    name: 'React Starter',
-    description: 'A minimal React + TypeScript template',
-    icon: '⚛️',
-    dependencies: {
-        'react': '^18.2.0',
-        'react-dom': '^18.2.0',
-    },
-    files: [
-        {
-            path: 'src/App.tsx',
-            language: 'tsx',
-            isEntryPoint: false,
-            content: `import './App.css';
+  id: 'react-starter',
+  name: 'React Starter',
+  description: 'A minimal React + TypeScript template',
+  icon: '⚛️',
+  dependencies: {
+    'react': '^18.2.0',
+    'react-dom': '^18.2.0',
+  },
+  files: [
+    {
+      path: 'src/App.tsx',
+      language: 'tsx',
+      isEntryPoint: false,
+      content: `import './App.css';
 
 function App() {
   return (
@@ -41,11 +41,11 @@ function App() {
 
 export default App;
 `,
-        },
-        {
-            path: 'src/App.css',
-            language: 'css',
-            content: `* {
+    },
+    {
+      path: 'src/App.css',
+      language: 'css',
+      content: `* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -124,12 +124,12 @@ body {
   color: #a855f7;
 }
 `,
-        },
-        {
-            path: 'src/main.tsx',
-            language: 'tsx',
-            isEntryPoint: true,
-            content: `import React from 'react';
+    },
+    {
+      path: 'src/main.tsx',
+      language: 'tsx',
+      isEntryPoint: true,
+      content: `import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
@@ -140,11 +140,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 );
 `,
-        },
-        {
-            path: 'src/index.css',
-            language: 'css',
-            content: `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    },
+    {
+      path: 'src/index.css',
+      language: 'css',
+      content: `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   --bg-primary: #0a0a0f;
@@ -170,11 +170,11 @@ body {
   min-height: 100vh;
 }
 `,
-        },
-        {
-            path: 'index.html',
-            language: 'html',
-            content: `<!DOCTYPE html>
+    },
+    {
+      path: 'index.html',
+      language: 'html',
+      content: `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -187,11 +187,11 @@ body {
   </body>
 </html>
 `,
-        },
-        {
-            path: 'package.json',
-            language: 'json',
-            content: `{
+    },
+    {
+      path: 'package.json',
+      language: 'json',
+      content: `{
   "name": "my-app",
   "private": true,
   "version": "0.0.1",
@@ -214,27 +214,29 @@ body {
   }
 }
 `,
-        },
-    ],
+    },
+  ],
 };
 
 export const blankTemplate: ProjectTemplate = {
-    id: 'blank',
-    name: 'Blank Project',
-    description: 'Start from scratch',
-    icon: '📄',
-    dependencies: {
-        'react': '^18.2.0',
-        'react-dom': '^18.2.0',
-    },
-    files: [
-        {
-            path: 'src/App.tsx',
-            language: 'tsx',
-            isEntryPoint: false,
-            content: `function App() {
+  id: 'blank',
+  name: 'Blank Project',
+  description: 'Start from scratch',
+  icon: '📄',
+  dependencies: {
+    'react': '^18.2.0',
+    'react-dom': '^18.2.0',
+  },
+  files: [
+    {
+      path: 'src/App.tsx',
+      language: 'tsx',
+      isEntryPoint: false,
+      content: `import './App.css';
+
+function App() {
   return (
-    <div>
+    <div className="app">
       <h1>Hello, World!</h1>
     </div>
   );
@@ -242,14 +244,60 @@ export const blankTemplate: ProjectTemplate = {
 
 export default App;
 `,
-        },
-        {
-            path: 'src/main.tsx',
-            language: 'tsx',
-            isEntryPoint: true,
-            content: `import React from 'react';
+    },
+    {
+      path: 'src/App.css',
+      language: 'css',
+      content: `.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0f;
+  color: #ffffff;
+}
+
+h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  background: linear-gradient(to right, #8b5cf6, #a855f7);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+`,
+    },
+    {
+      path: 'src/index.css',
+      language: 'css',
+      content: `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+`,
+    },
+    {
+      path: 'src/main.tsx',
+      language: 'tsx',
+      isEntryPoint: true,
+      content: `import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -257,11 +305,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 );
 `,
-        },
-        {
-            path: 'index.html',
-            language: 'html',
-            content: `<!DOCTYPE html>
+    },
+    {
+      path: 'index.html',
+      language: 'html',
+      content: `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -274,11 +322,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </body>
 </html>
 `,
-        },
-    ],
+    },
+  ],
 };
 
 export const templates: ProjectTemplate[] = [
-    reactTemplate,
-    blankTemplate,
+  reactTemplate,
+  blankTemplate,
 ];
