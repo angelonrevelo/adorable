@@ -127,27 +127,34 @@ export default function IDE() {
         setShowDashboard(true);
     }, [clearProject]);
 
-    // Export all project files as JSON for debugging/sharing
+    // Export all project files as readable text for debugging/sharing
     const handleExport = useCallback(() => {
         if (!project) return;
 
         const projectFiles = Array.from(files.values());
-        const exportData = {
-            projectName: project.name,
-            exportedAt: new Date().toISOString(),
-            files: projectFiles.map(f => ({
-                path: f.path,
-                language: f.language,
-                content: f.content
-            }))
-        };
 
-        // Create blob and download
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        // Create a readable text format with all files
+        let exportContent = `# ${project.name} - Exported Code\n`;
+        exportContent += `# Exported at: ${new Date().toISOString()}\n`;
+        exportContent += `# Total files: ${projectFiles.length}\n\n`;
+        exportContent += `${'='.repeat(80)}\n\n`;
+
+        projectFiles.forEach((file, index) => {
+            exportContent += `## FILE ${index + 1}: ${file.path}\n`;
+            exportContent += `## Language: ${file.language}\n`;
+            exportContent += `${'─'.repeat(60)}\n\n`;
+            exportContent += `\`\`\`${file.language === 'typescript' ? 'tsx' : file.language}\n`;
+            exportContent += file.content;
+            exportContent += `\n\`\`\`\n\n`;
+            exportContent += `${'='.repeat(80)}\n\n`;
+        });
+
+        // Create blob and download as .txt for easy reading
+        const blob = new Blob([exportContent], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${project.name.replace(/\s+/g, '_')}_export.json`;
+        a.download = `${project.name.replace(/\s+/g, '_')}_code.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -155,7 +162,7 @@ export default function IDE() {
 
         toast({
             title: 'Exported',
-            description: 'Project files downloaded as JSON.',
+            description: 'All code files downloaded as text.',
         });
     }, [project, files, toast]);
 
