@@ -12,7 +12,7 @@ import { ProjectDashboard } from '@/components/ProjectDashboard';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { ProjectService } from '@/services/projectService';
 import { templates } from '@/templates/projectTemplates';
-import { Home, Save, Loader2, Code2, X, ChevronLeft } from 'lucide-react';
+import { Home, Save, Loader2, Code2, X, ChevronLeft, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -127,6 +127,38 @@ export default function IDE() {
         setShowDashboard(true);
     }, [clearProject]);
 
+    // Export all project files as JSON for debugging/sharing
+    const handleExport = useCallback(() => {
+        if (!project) return;
+
+        const projectFiles = Array.from(files.values());
+        const exportData = {
+            projectName: project.name,
+            exportedAt: new Date().toISOString(),
+            files: projectFiles.map(f => ({
+                path: f.path,
+                language: f.language,
+                content: f.content
+            }))
+        };
+
+        // Create blob and download
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${project.name.replace(/\s+/g, '_')}_export.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast({
+            title: 'Exported',
+            description: 'Project files downloaded as JSON.',
+        });
+    }, [project, files, toast]);
+
     // Show dashboard
     if (showDashboard) {
         return (
@@ -167,6 +199,17 @@ export default function IDE() {
                             )}
                         </div>
                         <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleExport}
+                                disabled={!project}
+                                className="text-gray-400 hover:text-white"
+                                title="Download project files as JSON"
+                            >
+                                <Download className="w-4 h-4 mr-1" />
+                                Export
+                            </Button>
                             <Button
                                 variant="ghost"
                                 size="sm"
