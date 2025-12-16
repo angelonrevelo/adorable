@@ -595,9 +595,36 @@ import { MapPin, Navigation, Building, Image, Camera } from 'lucide-react';
 - Glassmorphism: bg-white/10 backdrop-blur-xl
 - NEVER use plain gray backgrounds or unstyled forms
 
-=== OUTPUT FORMAT ===
-Return JSON with "files" array (MULTIPLE files when needed):
+=== OUTPUT FORMAT (STREAMING) ===
+
+You must respond with a STREAM of JSON objects. Each object must be on a new line.
+
+1. Start with \`{"type": "thinking", "content": "Analyzing request..."}\`
+2. Stream tokens: \`{"type": "token", "content": "..."}\`
+3. End with a single JSON object containing the \`thought\` and \`files\` array.
+
+CRITICAL: The final response MUST be consistent with this schema:
+\`\`\`json
 {
+  "thought": "Brief explanation of your plan...",
+  "message": "User-facing message...",
+  "files": [
+    {
+      "type": "create" | "update",
+      "path": "src/components/Example.tsx",
+      "content": "..."
+    }
+  ]
+}
+\`\`\`
+
+IMPORTANT:
+- Do NOT wrap the final JSON in markdown code blocks.
+- Ensure all JSON is valid and properly escaped.
+- When fixing errors, carefully analyze the error message provided in the prompt.
+- If you import a library, ensure it is in the allowed list.
+- NEVER leave placeholders like \`// ... rest of code\`. ALWAYS write the full file content.
+
   "thought": "## FILE PLAN\\n- CREATE src/pages/GalleryPage.tsx\\n- MODIFY src/App.tsx to import it",
   "message": "Created gallery page", 
   "files": [

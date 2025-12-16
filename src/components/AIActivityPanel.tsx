@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useActivityStore, Activity, ActivityType } from '@/stores/useActivityStore';
 
 // Timer component that counts up while thinking
-function ThinkingTimer({ startTime, isActive }: { startTime: number; isActive: boolean }) {
+export function ThinkingTimer({ startTime, isActive }: { startTime: number; isActive: boolean }) {
     const [elapsed, setElapsed] = useState(0);
 
     useEffect(() => {
@@ -37,7 +37,7 @@ function ThinkingTimer({ startTime, isActive }: { startTime: number; isActive: b
 }
 
 // Activity icon based on type
-function ActivityIcon({ type, status }: { type: ActivityType; status: string }) {
+export function ActivityIcon({ type, status }: { type: ActivityType; status: string }) {
     const iconClass = "w-4 h-4";
 
     switch (type) {
@@ -59,7 +59,7 @@ function ActivityIcon({ type, status }: { type: ActivityType; status: string }) 
 }
 
 // Single activity item
-function ActivityItem({ activity }: { activity: Activity }) {
+export function ActivityItem({ activity }: { activity: Activity }) {
     const { toggleActivityExpanded } = useActivityStore();
     const hasContent = !!activity.content;
     const isExpanded = activity.isExpanded ?? false;

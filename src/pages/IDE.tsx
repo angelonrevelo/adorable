@@ -180,79 +180,85 @@ export default function IDE() {
         <div className="h-screen flex flex-col bg-[#0a0a0f] overflow-hidden">
             {/* Main Content: Chat + Preview */}
             <div className="flex-1 flex overflow-hidden">
-                {/* Left: Chat Panel */}
-                <div className="w-[320px] min-w-[280px] max-w-[400px] flex-shrink-0 border-r border-white/5">
-                    <IDEChatPanel />
-                </div>
+                <PanelGroup direction="horizontal">
+                    {/* Left: Chat Panel */}
+                    <Panel defaultSize={20} minSize={15} maxSize={40} className="min-w-[280px] border-r border-white/5 bg-[#0a0a0f]">
+                        <IDEChatPanel />
+                    </Panel>
 
-                {/* Right: Preview (Full width when code panel closed) */}
-                <div className="flex-1 flex flex-col min-w-0 relative">
-                    {/* Preview Header */}
-                    <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-[#0d0d12]">
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleGoHome}
-                                className="text-gray-400 hover:text-white"
-                            >
-                                <Home className="w-4 h-4 mr-1" />
-                                Home
-                            </Button>
-                            {project && (
-                                <span className="text-sm text-gray-500 border-l border-white/10 pl-3 ml-1">
-                                    {project.name}
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleExport}
-                                disabled={!project}
-                                className="text-gray-400 hover:text-white"
-                                title="Download project files as JSON"
-                            >
-                                <Download className="w-4 h-4 mr-1" />
-                                Export
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleSave}
-                                disabled={isSaving || !project}
-                                className="text-gray-400 hover:text-white"
-                            >
-                                {isSaving ? (
-                                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                                ) : (
-                                    <Save className="w-4 h-4 mr-1" />
-                                )}
-                                Save
-                            </Button>
-                            <Button
-                                variant={showCodePanel ? "secondary" : "outline"}
-                                size="sm"
-                                onClick={() => setShowCodePanel(!showCodePanel)}
-                                className={cn(
-                                    "transition-colors",
-                                    showCodePanel
-                                        ? "bg-purple-600 text-white hover:bg-purple-700"
-                                        : "border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
-                                )}
-                            >
-                                <Code2 className="w-4 h-4 mr-1" />
-                                Code
-                            </Button>
-                        </div>
-                    </div>
+                    <ResizeHandle />
 
-                    {/* Preview Area */}
-                    <div className="flex-1 overflow-hidden">
-                        <PreviewPanel />
-                    </div>
-                </div>
+                    {/* Right: Preview (Full width when code panel closed) */}
+                    <Panel>
+                        <div className="flex-1 flex flex-col min-w-0 relative h-full bg-[#0a0a0f]">
+                            {/* Preview Header */}
+                            <div className="flex items-center justify-between px-4 py-2 border-b border-white/5 bg-[#0d0d12]">
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleGoHome}
+                                        className="text-gray-400 hover:text-white"
+                                    >
+                                        <Home className="w-4 h-4 mr-1" />
+                                        Home
+                                    </Button>
+                                    {project && (
+                                        <span className="text-sm text-gray-500 border-l border-white/10 pl-3 ml-1">
+                                            {project.name}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleExport}
+                                        disabled={!project}
+                                        className="text-gray-400 hover:text-white"
+                                        title="Download project files as JSON"
+                                    >
+                                        <Download className="w-4 h-4 mr-1" />
+                                        Export
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleSave}
+                                        disabled={isSaving || !project}
+                                        className="text-gray-400 hover:text-white"
+                                    >
+                                        {isSaving ? (
+                                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                        ) : (
+                                            <Save className="w-4 h-4 mr-1" />
+                                        )}
+                                        Save
+                                    </Button>
+                                    <Button
+                                        variant={showCodePanel ? "secondary" : "outline"}
+                                        size="sm"
+                                        onClick={() => setShowCodePanel(!showCodePanel)}
+                                        className={cn(
+                                            "transition-colors",
+                                            showCodePanel
+                                                ? "bg-purple-600 text-white hover:bg-purple-700"
+                                                : "border-white/10 text-gray-300 hover:text-white hover:bg-white/5"
+                                        )}
+                                    >
+                                        <Code2 className="w-4 h-4 mr-1" />
+                                        Code
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Preview Area */}
+                            <div className="flex-1 overflow-hidden">
+                                <PreviewPanel />
+                            </div>
+                        </div>
+                    </Panel>
+                </PanelGroup>
             </div>
 
             {/* Code Panel Overlay (Slides in from right) */}

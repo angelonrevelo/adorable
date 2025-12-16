@@ -19,7 +19,7 @@ import {
     Brain,
     BookOpen
 } from 'lucide-react';
-import { AIActivityPanel } from './AIActivityPanel';
+import { AIActivityPanel, ActivityItem } from './AIActivityPanel';
 import { useActivityStore } from '@/stores/useActivityStore';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
@@ -61,6 +61,8 @@ export function IDEChatPanel() {
         addEditing,
         addExplaining,
         addError,
+        activities,
+        isActive,
     } = useActivityStore();
 
     const [input, setInput] = useState('');
@@ -83,7 +85,7 @@ export function IDEChatPanel() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages]);
+    }, [messages, activities]); // Added activities to dependency array
 
     // Auto-resize textarea
     useEffect(() => {
@@ -127,9 +129,11 @@ export function IDEChatPanel() {
             setAutoRetryCount(0);
             setLastErrorHash(null);
         }
-    }, [sandpackError, isGenerating, autoRetryCount, lastErrorHash, retryCooldownUntil]);
+    }, [sandpackError, isGenerating, autoRetryCount, lastErrorHash, retryCooldownUntil, handleFixError]); // Added handleFixError to dependency array
 
-    const handleSend = useCallback(async () => {
+    const handleSend = useCallback(async (e?: React.FormEvent) => {
+        e?.preventDefault(); // Prevent default form submission if called from form
+
         if (!input.trim() || isGenerating) return;
 
         const userInput = input.trim();
@@ -253,7 +257,7 @@ export function IDEChatPanel() {
             setGenerating(false);
             endSession();
         }
-    }, [input, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations, startSession, endSession, startThinking, stopThinking, addReading, addEditing, addExplaining, addError]);
+    }, [input, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations, startSession, endSession, startThinking, stopThinking, addReading, addEditing, addExplaining, addError, attachments, knowledgeInput]);
 
     // Handle Fix error button click
     const handleFixError = useCallback(async () => {
@@ -447,7 +451,7 @@ export function IDEChatPanel() {
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-hide">
-                {messages.length === 0 ? (
+                {messages.length === 0 && !isActive ? (
                     <div className="flex flex-col items-center justify-center h-full space-y-4 animate-fade-in">
                         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-yellow-500/20 to-red-500/10 flex items-center justify-center">
                             <Sparkles className="w-7 h-7 text-yellow-400" />
@@ -465,77 +469,91 @@ export function IDEChatPanel() {
                             <div
                                 key={message.id}
                                 className={cn(
-                                    'animate-fade-in',
-                                    message.role === 'user' ? 'flex justify-end' : ''
+                                    "group relative mb-4 flex items-start",
+                                    message.role === 'user' ? "flex-row-reverse" : "flex-row"
                                 )}
                             >
-                                {message.role === 'user' ? (
-                                    <div className="max-w-[85%] bg-gradient-to-r from-yellow-600/90 to-red-600/90 rounded-2xl rounded-br-md px-4 py-2.5 shadow-lg">
-                                        <p className="text-sm text-white leading-relaxed">{message.content}</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {/* Thought Block - Collapsible */}
-                                        {message.thought && (
-                                            <div className="bg-[#13131a] border border-white/5 rounded-xl overflow-hidden">
-                                                <button
-                                                    onClick={() => toggleThought(message.id)}
-                                                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                                                        <span className="text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                                                            Thinking
-                                                        </span>
-                                                    </div>
-                                                    {expandedThoughts.has(message.id) ? (
-                                                        <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
-                                                    ) : (
-                                                        <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-                                                    )}
-                                                </button>
-                                                {expandedThoughts.has(message.id) && (
-                                                    <div className="px-3 pb-3">
-                                                        <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">
-                                                            {message.thought}
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                <div className={cn(
+                                    "flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md border text-xs shadow",
+                                    message.role === 'user'
+                                        ? "border-white/10 bg-[#2b2d31] text-white"
+                                        : "border-purple-500/20 bg-purple-500/10 text-purple-400"
+                                )}>
+                                    {message.role === 'user' ? (
+                                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500" />
+                                    ) : (
+                                        <Sparkles className="w-4 h-4" />
+                                    )}
+                                </div>
 
-                                        {/* Main Message */}
-                                        <div className="bg-[#16161e] border border-white/5 rounded-2xl rounded-tl-md px-4 py-3">
-                                            <p className="text-sm text-gray-100 whitespace-pre-wrap leading-relaxed">
-                                                {message.content}
-                                            </p>
-                                        </div>
+                                <div className={cn(
+                                    "relative ml-2 mr-2 max-w-[calc(100%-3rem)] rounded-lg px-3 py-2 text-sm leading-normal shadow-md",
+                                    message.role === 'user'
+                                        ? "bg-[#2b2d31] text-white"
+                                        : "bg-[#1e1e24] text-gray-100 border border-white/5"
+                                )}>
+                                    <div className="whitespace-pre-wrap">{message.content}</div>
 
-                                        {/* File Operations */}
-                                        {message.fileOperations && message.fileOperations.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {message.fileOperations.map((op, i) => (
-                                                    <span
-                                                        key={i}
-                                                        className={cn(
-                                                            'inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg font-medium',
-                                                            op.action === 'create' && 'bg-green-500/15 text-green-400 border border-green-500/20',
-                                                            op.action === 'modify' && 'bg-blue-500/15 text-blue-400 border border-blue-500/20',
-                                                            op.action === 'delete' && 'bg-red-500/15 text-red-400 border border-red-500/20'
-                                                        )}
-                                                    >
-                                                        {op.action}: {op.path.split('/').pop()}
+                                    {/* Thought Block - Collapsible */}
+                                    {message.thought && (
+                                        <div className="mt-2 bg-[#13131a] border border-white/5 rounded-xl overflow-hidden">
+                                            <button
+                                                onClick={() => toggleThought(message.id)}
+                                                className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                                                    <span className="text-xs font-medium text-cyan-400 uppercase tracking-wider">
+                                                        Thinking
                                                     </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                                </div>
+                                                {expandedThoughts.has(message.id) ? (
+                                                    <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
+                                                ) : (
+                                                    <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                                                )}
+                                            </button>
+                                            {expandedThoughts.has(message.id) && (
+                                                <div className="px-3 pb-3">
+                                                    <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">
+                                                        {message.thought}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         ))}
 
-                        {/* Generating Indicator */}
-                        {isGenerating && (
+                        {/* Inline Activity Bubble */}
+                        {(isActive || activities.length > 0) && (
+                            <div className="mb-4 pl-4 pr-12 animate-fade-in">
+                                <div className="bg-[#111118] border border-white/10 rounded-lg p-3">
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5 text-xs text-gray-500 font-medium uppercase tracking-wider">
+                                        {isActive ? (
+                                            <>
+                                                <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
+                                                <span>AI Working...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Brain className="w-3 h-3 text-purple-400" />
+                                                <span>Activities</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="space-y-1">
+                                        {activities.map((activity) => (
+                                            <ActivityItem key={activity.id} activity={activity} />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Generating Indicator - Simple Fallback */}
+                        {isGenerating && !isActive && (
                             <div className="flex items-center gap-3 animate-fade-in">
                                 <div className="flex items-center gap-2 px-3 py-2 bg-[#16161e] rounded-xl border border-white/5">
                                     <div className="flex gap-1">
@@ -754,11 +772,7 @@ export function IDEChatPanel() {
                     </div>
                 </div>
 
-                {/* AI Activity Panel */}
-                <AIActivityPanel
-                    isVisible={showActivity}
-                    onToggle={() => setShowActivity(false)}
-                />
+
             </div>
         </div>
     );
