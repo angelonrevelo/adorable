@@ -19,23 +19,22 @@ export function ConfirmChangesPanel({
   onReject 
 }: ConfirmChangesPanelProps) {
   const [showThought, setShowThought] = useState(false);
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   
   const getActionIcon = (action: string) => {
     switch (action) {
       case 'create':
-        return <FilePlus className="w-4 h-4 text-emerald-400" />;
+        return <FilePlus className="w-3.5 h-3.5 text-emerald-400" />;
       case 'delete':
-        return <FileX className="w-4 h-4 text-red-400" />;
+        return <FileX className="w-3.5 h-3.5 text-red-400" />;
       default:
-        return <FileCode className="w-4 h-4 text-yellow-400" />;
+        return <FileCode className="w-3.5 h-3.5 text-amber-400" />;
     }
   };
   
   const getActionLabel = (action: string) => {
     switch (action) {
       case 'create':
-        return 'Create';
+        return 'New';
       case 'delete':
         return 'Delete';
       default:
@@ -43,44 +42,32 @@ export function ConfirmChangesPanel({
     }
   };
   
-  const toggleFileExpanded = (path: string) => {
-    setExpandedFiles(prev => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  };
-  
   return (
-    <div className="border border-yellow-500/30 rounded-xl bg-yellow-500/5 backdrop-blur overflow-hidden animate-fade-in">
+    <div className="rounded-2xl bg-amber-950/40 border border-amber-500/20 overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-yellow-500/20 bg-yellow-500/10">
+      <div className="px-4 py-3 bg-amber-900/30">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-yellow-400" />
-          <h3 className="text-sm font-medium text-white">Proposed Changes</h3>
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span className="text-sm font-medium text-amber-100">Proposed Changes</span>
         </div>
         {message && (
-          <p className="text-xs text-gray-400 mt-1">{message}</p>
+          <p className="text-xs text-amber-200/70 mt-1 leading-relaxed">{message}</p>
         )}
       </div>
       
       {/* AI Thought (collapsible) */}
       {thought && (
-        <div className="border-b border-yellow-500/20">
+        <div className="border-t border-amber-500/10">
           <button
             onClick={() => setShowThought(!showThought)}
-            className="w-full px-4 py-2 flex items-center gap-2 text-sm text-gray-400 hover:bg-white/5 transition-colors"
+            className="w-full px-4 py-2.5 flex items-center gap-2 text-xs text-amber-300/60 hover:text-amber-200 hover:bg-amber-900/20 transition-colors"
           >
-            {showThought ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {showThought ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
             <span>View AI's reasoning</span>
           </button>
           {showThought && (
             <div className="px-4 pb-3">
-              <p className="text-sm text-gray-300 bg-black/30 p-3 rounded-lg">
+              <p className="text-xs text-amber-100/80 bg-black/20 p-3 rounded-xl leading-relaxed whitespace-pre-wrap">
                 {thought}
               </p>
             </div>
@@ -89,64 +76,58 @@ export function ConfirmChangesPanel({
       )}
       
       {/* File operations list */}
-      <div className="px-4 py-3 space-y-2 max-h-60 overflow-y-auto">
-        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+      <div className="px-4 py-3 border-t border-amber-500/10">
+        <p className="text-[10px] text-amber-400/50 uppercase tracking-wider font-medium mb-2">
           Proposed changes ({operations.length} file{operations.length !== 1 ? 's' : ''})
         </p>
         
-        {operations.map((op) => {
-          const isExpanded = expandedFiles.has(op.path);
-          const fileName = op.path.split('/').pop() || op.path;
-          
-          return (
-            <div key={op.path} className="border border-white/10 rounded-lg overflow-hidden">
-              <button
-                onClick={() => toggleFileExpanded(op.path)}
-                className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 transition-colors"
+        <div className="space-y-1.5">
+          {operations.map((op) => {
+            const fileName = op.path.split('/').pop() || op.path;
+            const directory = op.path.includes('/') ? op.path.substring(0, op.path.lastIndexOf('/') + 1) : '';
+            
+            return (
+              <div 
+                key={op.path} 
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/20 border border-white/5"
               >
-                {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
                 {getActionIcon(op.action)}
-                <span className="flex-1 text-left">
-                  <span className="text-white text-sm">{fileName}</span>
-                  <span className="text-gray-500 text-xs ml-2">{op.path}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="text-sm text-white font-medium">{fileName}</span>
+                  {directory && (
+                    <span className="text-xs text-slate-500 ml-1.5">{directory}</span>
+                  )}
                 </span>
-                <span className={cn(
-                  'text-xs px-2 py-0.5 rounded',
-                  op.action === 'create' && 'bg-emerald-500/20 text-emerald-400',
-                  op.action === 'modify' && 'bg-yellow-500/20 text-yellow-400',
-                  op.action === 'delete' && 'bg-red-500/20 text-red-400',
-                )}>
-                  {getActionLabel(op.action)}
-                </span>
-              </button>
-              
-              {isExpanded && op.content && (
-                <div className="border-t border-white/10 bg-black/30">
-                  <pre className="text-xs text-gray-300 p-3 overflow-x-auto max-h-40 overflow-y-auto">
-                    {op.content.slice(0, 2000)}{op.content.length > 2000 ? '\n... (truncated)' : ''}
-                  </pre>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                {op.action !== 'create' && (
+                  <span className={cn(
+                    'text-[10px] px-2 py-0.5 rounded-md font-medium',
+                    op.action === 'modify' && 'bg-amber-500/20 text-amber-300',
+                    op.action === 'delete' && 'bg-red-500/20 text-red-300',
+                  )}>
+                    {getActionLabel(op.action)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
       
       {/* Actions */}
-      <div className="px-4 py-3 border-t border-yellow-500/20 bg-yellow-500/10 flex items-center justify-end gap-3">
+      <div className="px-4 py-3 border-t border-amber-500/10 flex items-center gap-2">
         <button
           onClick={onReject}
-          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
         >
-          <X className="w-4 h-4" />
-          Reject
+          <X className="w-3.5 h-3.5" />
+          <span>Reject</span>
         </button>
         <button
           onClick={onConfirm}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-medium rounded-lg hover:opacity-90 transition-opacity"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm bg-gradient-to-r from-amber-500 to-orange-500 text-black font-semibold rounded-xl hover:opacity-90 transition-opacity"
         >
           <Check className="w-4 h-4" />
-          Apply Changes
+          <span>Apply Changes</span>
         </button>
       </div>
     </div>
