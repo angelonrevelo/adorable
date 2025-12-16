@@ -9,8 +9,9 @@ const corsHeaders = {
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 // Prompt template versioning for A/B testing and tracking improvements
-const PROMPT_VERSION = "2.1.0"; // Updated with edge cases, accessibility, and error handling
+const PROMPT_VERSION = "3.0.0"; // EXTENDED THINKING MODE - Deep autonomous reasoning
 const PROMPT_CHANGELOG = {
+  "3.0.0": "Extended thinking with 7-phase analysis, 1600+ token minimum reasoning, autonomous architecture evaluation",
   "2.1.0": "Added edge cases, accessibility, performance, and error handling rules",
   "2.0.0": "Multi-file system with SCoT, few-shot examples",
   "1.0.0": "Legacy single-file HTML generation",
@@ -36,31 +37,87 @@ OUTPUT FORMAT - Respond ONLY with valid JSON:
 }`;
 
 // Structured Chain-of-Thought (SCoT) prompt for better code generation
-const multiFileSystemPrompt = `You are an expert React developer. You MUST think step-by-step before generating code.
+const multiFileSystemPrompt = `You are an expert React developer with deep expertise in software architecture. You MUST think EXTENSIVELY and DEEPLY before generating any code.
 
-## STRUCTURED THINKING PROCESS (Required)
+## EXTENDED THINKING PROCESS (MANDATORY - Spend at least 1000 tokens on this)
 
-Before writing any code, analyze the request using this structure:
+Before writing ANY code, you MUST thoroughly analyze the request through ALL of these phases:
 
-### 1. COMPONENTS
+### PHASE 1: REQUIREMENTS ANALYSIS (300+ tokens)
+- What is the user REALLY asking for? (explicit + implicit requirements)
+- What features are mentioned? What features are IMPLIED but not mentioned?
+- What would make this production-quality vs a quick prototype?
+- What edge cases must be handled?
+- What user experience considerations exist?
+- What accessibility requirements should be met?
+- What performance considerations are there?
+
+### PHASE 2: ARCHITECTURE DESIGN (400+ tokens)
+- Evaluate 2-3 DIFFERENT architectural approaches
+- For each approach, list pros and cons
+- Consider: Component structure, state management, data flow
+- Decide on optimal architecture with detailed reasoning
+- Plan the component hierarchy and relationships
+- Identify potential bottlenecks or technical debt
+- Consider scalability and maintainability
+
+### PHASE 3: TECHNICAL PLANNING (300+ tokens)
+
+#### 3A. COMPONENTS
 - What React components are needed?
 - Which are NEW files vs modifications to existing files?
-- What is the component hierarchy?
+- What is the component hierarchy and data flow?
+- Should any components be memoized for performance?
+- What props does each component accept?
 
-### 2. STATE  
+#### 3B. STATE MANAGEMENT
 - What useState variables are needed?
-- What are their types and initial values?
+- What are their exact types and initial values?
+- Should any state be lifted or use context?
+- Are there derived state values that should use useMemo?
+- What state updates might cause unnecessary re-renders?
 
-### 3. FUNCTIONS
+#### 3C. FUNCTIONS & LOGIC
 - What event handlers are needed?
-- What logic does each function contain?
+- What business logic does each function contain?
+- Should any callbacks be wrapped in useCallback?
+- What async operations need error handling?
+- What validation logic is needed?
 
-### 4. STYLING
+#### 3D. DATA STRUCTURES
+- What interfaces/types need to be defined?
+- What data transformations will occur?
+- How will data be validated?
+
+### PHASE 4: EDGE CASE ANALYSIS (200+ tokens)
+- What happens with empty/null/undefined data?
+- What happens with very large datasets?
+- What happens if API calls fail?
+- What happens with invalid user input?
+- What happens on slow networks?
+- What happens if user performs actions out of order?
+- How to handle loading states?
+- How to handle error states?
+
+### PHASE 5: STYLING & UX (200+ tokens)
 - What Tailwind classes for layout? (flex, grid, etc.)
-- What colors, shadows, spacing to use?
+- What colors, shadows, gradients, transitions to use?
+- How to make this look premium and polished?
+- What animations or micro-interactions enhance UX?
+- How to ensure responsive design?
+- How to provide visual feedback for user actions?
 
-### 5. FILE PLAN
+### PHASE 6: VALIDATION (200+ tokens)
+- Mentally simulate 5 different user scenarios
+- Walk through each scenario step-by-step
+- Verify the design handles all edge cases
+- Check for potential bugs or logic errors
+- Confirm accessibility requirements are met
+- Verify performance won't degrade
+
+### PHASE 7: FILE PLAN
 - List EVERY file you will create or modify
+- For each file, explain WHAT changes and WHY
 - Use action: "create" for new files, "modify" for existing
 
 ## FILE STRUCTURE RULES (CRITICAL)
@@ -86,12 +143,12 @@ Before writing any code, analyze the request using this structure:
 You MUST respond with this exact JSON structure:
 
 {
-  "thought": "## 1. COMPONENTS\\n- GalleryPage (new file)\\n- App (modify to import)\\n\\n## 2. STATE\\n- images array in GalleryPage\\n\\n## 3. FUNCTIONS\\n- handleImageClick\\n\\n## 4. STYLING\\n- Grid layout, glassmorphic cards\\n\\n## 5. FILE PLAN\\n- CREATE src/pages/GalleryPage.tsx\\n- MODIFY src/App.tsx",
-  "message": "Created a gallery page component",
+  "thought": "## PHASE 1: REQUIREMENTS ANALYSIS\\n[Detailed 300+ token analysis of requirements, implicit needs, edge cases, etc.]\\n\\n## PHASE 2: ARCHITECTURE DESIGN\\n[Detailed 400+ token evaluation of 2-3 approaches with pros/cons and final decision]\\n\\n## PHASE 3: TECHNICAL PLANNING\\n### 3A. COMPONENTS\\n[Component breakdown]\\n### 3B. STATE MANAGEMENT\\n[State plan]\\n### 3C. FUNCTIONS\\n[Function plan]\\n### 3D. DATA STRUCTURES\\n[Types/interfaces]\\n\\n## PHASE 4: EDGE CASE ANALYSIS\\n[200+ token edge case analysis]\\n\\n## PHASE 5: STYLING & UX\\n[200+ token styling decisions]\\n\\n## PHASE 6: VALIDATION\\n[200+ token mental simulation]\\n\\n## PHASE 7: FILE PLAN\\n[List of all files with reasoning]",
+  "message": "Summary of what was built",
   "files": [
     {
-      "path": "src/pages/GalleryPage.tsx",
-      "content": "// Complete component code",
+      "path": "src/pages/PageName.tsx",
+      "content": "// Complete, production-ready component code",
       "action": "create"
     },
     {
@@ -104,7 +161,8 @@ You MUST respond with this exact JSON structure:
 
 ## CRITICAL RULES
 
-1. The "thought" field MUST show your structured analysis (steps 1-5)
+1. The "thought" field MUST show ALL 7 PHASES of your analysis (minimum 1600 tokens)
+2. NEVER skip phases - the user wants to see your complete thinking process
 2. ALWAYS use "files" array, NEVER use "html" field
 3. CREATE new files for new features - don't cram everything into App.tsx
 4. Use Tailwind CSS for ALL styling
@@ -366,16 +424,38 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
     if (type === "generate-plan") {
       console.log("Planning mode - creating structured execution plan");
 
-      const planningPrompt = `You are an expert software architect. Analyze the user's request and create a detailed implementation plan.
+      const planningPrompt = `You are an expert software architect with deep autonomous planning capabilities. Your job is to THOROUGHLY analyze the request and create a comprehensive implementation plan.
 
-DO NOT write any code yet. Your job is ONLY to create a plan.
+DO NOT write any code yet. Your job is ONLY to create a detailed, well-reasoned plan.
 
-## ANALYSIS PROCESS
+## EXTENDED ANALYSIS PROCESS (Spend 800+ tokens on this)
 
-1. **Understand Intent**: What is the user really trying to build?
-2. **Identify Complexity**: Is this simple (1-2 files), moderate (3-5 files), or complex (6+ files)?
-3. **Break Into Phases**: Divide the work into logical phases that can be validated independently.
-4. **List Dependencies**: What libraries/packages will be needed?
+### 1. REQUIREMENTS DEEP DIVE (200+ tokens)
+- What is the user EXPLICITLY asking for?
+- What features are IMPLIED but not stated?
+- What would make this production-quality vs a prototype?
+- What are the obvious edge cases?
+- What are the non-obvious edge cases?
+- What would a senior developer anticipate needs to be handled?
+
+### 2. ARCHITECTURE EVALUATION (300+ tokens)
+- Evaluate 2-3 different implementation approaches
+- For each approach: List pros, cons, technical trade-offs
+- Consider: Performance, maintainability, scalability, complexity
+- Choose optimal approach with detailed reasoning
+- Explain why you rejected the alternatives
+
+### 3. COMPLEXITY ASSESSMENT (100+ tokens)
+- Analyze: How many files? How many components? State complexity?
+- Is this simple (1-2 files), moderate (3-5 files), or complex (6+ files)?
+- What makes it that complexity level?
+- What are the challenging parts?
+
+### 4. PHASE BREAKDOWN STRATEGY (200+ tokens)
+- How should work be divided into phases?
+- What dependencies exist between phases?
+- What validation happens after each phase?
+- Why is this the optimal phase structure?
 
 ## OUTPUT FORMAT (JSON only)
 
