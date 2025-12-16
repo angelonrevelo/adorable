@@ -89,6 +89,7 @@ export function IDEChatPanel() {
     const [retryCooldownUntil, setRetryCooldownUntil] = useState<number>(0);
     const [showContextInfo, setShowContextInfo] = useState(false);
     const [executingPhaseIndex, setExecutingPhaseIndex] = useState<number>(-1);
+    const [consoleHistory, setConsoleHistory] = useState<string[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -100,6 +101,43 @@ export function IDEChatPanel() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Capture console logs from sandbox
+    useEffect(() => {
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        console.log = (...args: any[]) => {
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ');
+            setConsoleHistory(prev => [...prev.slice(-50), `[LOG] ${message}`]);
+            originalLog(...args);
+        };
+
+        console.error = (...args: any[]) => {
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ');
+            setConsoleHistory(prev => [...prev.slice(-50), `[ERROR] ${message}`]);
+            originalError(...args);
+        };
+
+        console.warn = (...args: any[]) => {
+            const message = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ');
+            setConsoleHistory(prev => [...prev.slice(-50), `[WARN] ${message}`]);
+            originalWarn(...args);
+        };
+
+        return () => {
+            console.log = originalLog;
+            console.error = originalError;
+            console.warn = originalWarn;
+        };
+    }, []);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -217,6 +255,12 @@ export function IDEChatPanel() {
             // CRITICAL: Add current sandbox error context if exists
             if (sandpackError) {
                 fullContext += `\n\n=== CURRENT ERROR IN SANDBOX ===\n${sandpackError}\n\nIMPORTANT: The user's app is currently showing this error. If your changes are related, make sure to fix it.\n`;
+            }
+
+            // Add console output for debugging context
+            if (consoleHistory.length > 0) {
+                const recentLogs = consoleHistory.slice(-20).join('\n');
+                fullContext += `\n\n=== CONSOLE OUTPUT (Last 20 lines) ===\n${recentLogs}\n\nINFO: This shows what's actually happening in the user's app. Use this to debug issues.\n`;
             }
 
             // Use streaming generator
@@ -394,6 +438,13 @@ ${sandpackError ? `
 ${sandpackError}
 
 IMPORTANT: Fix this error if it's related to your phase.
+` : ''}
+
+${consoleHistory.length > 0 ? `
+=== CONSOLE OUTPUT (Last 20 lines) ===
+${consoleHistory.slice(-20).join('\n')}
+
+INFO: This shows what's happening in the app. Use for debugging.
 ` : ''}
 
 CRITICAL INSTRUCTIONS:

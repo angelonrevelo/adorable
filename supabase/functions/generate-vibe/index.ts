@@ -187,6 +187,201 @@ You MUST respond with this exact JSON structure:
 
 ## PROMPT VERSION: ${PROMPT_VERSION}`;
 
+// =====================
+// SELF-CORRECTION: Validate generated code
+// =====================
+
+interface ValidationIssue {
+  type: 'error' | 'warning';
+  file: string;
+  issue: string;
+}
+
+function validateGeneratedCode(files: any[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+
+  for (const file of files) {
+    if (!file.path.endsWith('.tsx') && !file.path.endsWith('.ts') && !file.path.endsWith('.jsx')) {
+      continue; // Only validate TypeScript/React files
+    }
+
+    const content = file.content;
+
+    // Check 1: Missing imports that are used
+    const imports = content.match(/import .* from ['"](.*)['"];?/g) || [];
+    const importedModules = imports.map((imp: string) => {
+      const match = imp.match(/from ['"](.*)['"]/);
+      return match ? match[1] : '';
+    });
+
+    // Check for React usage without import
+    if ((content.includes('useState') || content.includes('useEffect') || content.includes('React.'))
+        && !imports.some((imp: string) => imp.includes('react'))) {
+      issues.push({
+        type: 'error',
+        file: file.path,
+        issue: 'Uses React hooks/features but missing "import React from \'react\'"'
+      });
+    }
+
+    // Check 2: Importing non-existent relative files
+    const relativeImports = importedModules.filter((mod: string) => mod.startsWith('./') || mod.startsWith('../'));
+    for (const relImport of relativeImports) {
+      const importPath = relImport.replace(/^\.\//, 'src/').replace(/\.\w+$/, '');
+      const expectedFile = files.find(f =>
+        f.path.includes(importPath) || f.path.replace(/\.\w+$/, '') === importPath
+      );
+      if (!expectedFile) {
+        issues.push({
+          type: 'error',
+          file: file.path,
+          issue: `Imports "${relImport}" but this file was not created`
+        });
+      }
+    }
+
+    // Check 3: Missing export default
+    if (!content.includes('export default') && !content.includes('export {')) {
+      issues.push({
+        type: 'warning',
+        file: file.path,
+        issue: 'Missing "export default" - component may not be importable'
+      });
+    }
+
+    // Check 4: Syntax issues
+    const openBraces = (content.match(/{/g) || []).length;
+    const closeBraces = (content.match(/}/g) || []).length;
+    if (openBraces !== closeBraces) {
+      issues.push({
+        type: 'error',
+        file: file.path,
+        issue: `Mismatched braces: ${openBraces} opening, ${closeBraces} closing`
+      });
+    }
+
+    // Check 5: HTML comments in JSX
+    if (content.includes('<!--')) {
+      issues.push({
+        type: 'error',
+        file: file.path,
+        issue: 'Contains HTML comments (<!--) instead of JSX comments ({/* */})'
+      });
+    }
+
+    // Check 6: className vs class
+    const classRegex = /\sclass=/g;
+    if (classRegex.test(content)) {
+      issues.push({
+        type: 'error',
+        file: file.path,
+        issue: 'Uses "class=" instead of "className=" in JSX'
+      });
+    }
+  }
+
+  return issues;
+}
+
+async function attemptSelfCorrection(
+  originalPrompt: string,
+  files: any[],
+  issues: ValidationIssue[],
+  model: string,
+  systemPrompt: string,
+  GEMINI_API_KEY: string
+): Promise<any[]> {
+  console.log(`Attempting self-correction for ${issues.length} issues`);
+
+  const correctionPrompt = `
+SELF-CORRECTION REQUIRED
+
+You generated code with the following issues:
+
+${issues.map((issue, i) => `${i + 1}. [${issue.type.toUpperCase()}] ${issue.file}: ${issue.issue}`).join('\n')}
+
+Original request: ${originalPrompt}
+
+Generated files:
+${files.map(f => `- ${f.path} (${f.action})`).join('\n')}
+
+TASK: Fix ALL issues listed above. Return the corrected files with the same structure.
+
+CRITICAL:
+- Fix EVERY issue mentioned
+- Maintain all original functionality
+- Return complete file contents (not just changes)
+- Use proper imports, exports, JSX syntax
+`.trim();
+
+  const messages = [
+    {
+      role: "user",
+      parts: [{ text: correctionPrompt }],
+    },
+  ];
+
+  const multiFileSchema = {
+    type: "OBJECT",
+    properties: {
+      thought: { type: "STRING", description: "Explanation of fixes made" },
+      message: { type: "STRING", description: "Summary of corrections" },
+      files: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            path: { type: "STRING" },
+            content: { type: "STRING" },
+            action: { type: "STRING", enum: ["create", "modify", "delete"] }
+          },
+          required: ["path", "content", "action"]
+        }
+      }
+    },
+    required: ["thought", "message", "files"]
+  };
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: messages,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          temperature: 0.3, // Lower temp for corrections
+          maxOutputTokens: 32768,
+          responseMimeType: "application/json",
+          responseSchema: multiFileSchema
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    console.error("Self-correction API call failed");
+    return files; // Return original if correction fails
+  }
+
+  const data = await response.json();
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!content) {
+    console.error("No content in correction response");
+    return files;
+  }
+
+  try {
+    const corrected = JSON.parse(content);
+    console.log("Self-correction successful");
+    return corrected.files || files;
+  } catch (e) {
+    console.error("Failed to parse correction response");
+    return files;
+  }
+}
 
 
 serve(async (req) => {
@@ -204,7 +399,23 @@ serve(async (req) => {
 
     console.log("Received request:", { type, promptLength: prompt?.length, historyLength: history?.length });
 
-    const model = "gemini-2.0-flash-001"; // Fast model to avoid timeout
+    // Smart model selection based on task complexity
+    const isComplexTask =
+      type === "generate-plan" || // Planning always needs Pro
+      (prompt && (
+        prompt.length > 200 || // Long prompts likely complex
+        prompt.toLowerCase().includes('game') ||
+        prompt.toLowerCase().includes('algorithm') ||
+        prompt.toLowerCase().includes('complex') ||
+        prompt.toLowerCase().includes('architecture') ||
+        (projectFiles && projectFiles.length > 5) // Large projects
+      ));
+
+    const model = isComplexTask
+      ? "gemini-2.0-flash-thinking-exp-01-21" // Advanced thinking for complex tasks
+      : "gemini-2.0-flash-001"; // Fast for simple tasks
+
+    console.log(`Selected model: ${model} (complex: ${isComplexTask})`);
 
     // =====================
     // STREAMING HANDLER (SSE)
@@ -386,6 +597,36 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
                 }
                 return file;
               });
+
+              // SELF-CORRECTION for streaming mode
+              const issues = validateGeneratedCode(aiResponse.files);
+              if (issues.length > 0) {
+                const errorIssues = issues.filter((i: ValidationIssue) => i.type === 'error');
+                console.log(`[STREAM] Validation found ${errorIssues.length} errors`);
+
+                if (errorIssues.length > 0 && errorIssues.length <= 10) {
+                  try {
+                    const correctedFiles = await attemptSelfCorrection(
+                      prompt,
+                      aiResponse.files,
+                      errorIssues,
+                      model,
+                      multiFileSystemPrompt,
+                      GEMINI_API_KEY as string
+                    );
+                    const remainingErrors = validateGeneratedCode(correctedFiles).filter((i: ValidationIssue) => i.type === 'error');
+                    if (remainingErrors.length < errorIssues.length) {
+                      console.log(`[STREAM] Self-correction: ${errorIssues.length} -> ${remainingErrors.length} errors`);
+                      aiResponse.files = correctedFiles;
+                      aiResponse.message += ` (Auto-corrected ${errorIssues.length - remainingErrors.length} issues)`;
+                    }
+                  } catch (e) {
+                    console.error("[STREAM] Self-correction failed:", e);
+                  }
+                }
+              } else {
+                console.log("[STREAM] Validation passed ✓");
+              }
             }
 
             // Send the final "done" event with parsed data
@@ -2363,6 +2604,57 @@ export default App;
       });
 
       console.log("Self-fixing applied:", debugLog.join('\n'));
+    }
+
+    // =====================
+    // SELF-CORRECTION: Validate and fix issues
+    // =====================
+    if (parsed.files && Array.isArray(parsed.files) && type === 'generate-multifile') {
+      const issues = validateGeneratedCode(parsed.files);
+
+      if (issues.length > 0) {
+        const errorIssues = issues.filter(i => i.type === 'error');
+        console.log(`Validation found ${issues.length} issues (${errorIssues.length} errors)`);
+
+        // Log all issues
+        issues.forEach(issue => {
+          console.log(`[${issue.type.toUpperCase()}] ${issue.file}: ${issue.issue}`);
+        });
+
+        // Only attempt correction for errors (not warnings)
+        if (errorIssues.length > 0 && errorIssues.length <= 10) {
+          console.log("Attempting self-correction...");
+          try {
+            const correctedFiles = await attemptSelfCorrection(
+              prompt,
+              parsed.files,
+              errorIssues,
+              model,
+              multiFileSystemPrompt,
+              GEMINI_API_KEY as string
+            );
+
+            // Validate corrected files
+            const remainingIssues = validateGeneratedCode(correctedFiles);
+            const remainingErrors = remainingIssues.filter(i => i.type === 'error');
+
+            if (remainingErrors.length < errorIssues.length) {
+              console.log(`Self-correction improved code: ${errorIssues.length} -> ${remainingErrors.length} errors`);
+              parsed.files = correctedFiles;
+              parsed.message = `${parsed.message} (Auto-corrected ${errorIssues.length - remainingErrors.length} issues)`;
+            } else {
+              console.log("Self-correction did not improve code, keeping original");
+            }
+          } catch (correctionError) {
+            console.error("Self-correction failed:", correctionError);
+            // Continue with original files
+          }
+        } else if (errorIssues.length > 10) {
+          console.log("Too many errors for self-correction, returning original");
+        }
+      } else {
+        console.log("Validation passed: No issues found ✓");
+      }
     }
 
     // Add debug info to response
