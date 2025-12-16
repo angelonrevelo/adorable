@@ -337,6 +337,120 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
       });
     }
 
+    // =====================
+    // PLANNING MODE HANDLER
+    // =====================
+    if (type === "generate-plan") {
+      console.log("Planning mode - creating structured execution plan");
+
+      const planningPrompt = `You are an expert software architect. Analyze the user's request and create a detailed implementation plan.
+
+DO NOT write any code yet. Your job is ONLY to create a plan.
+
+## ANALYSIS PROCESS
+
+1. **Understand Intent**: What is the user really trying to build?
+2. **Identify Complexity**: Is this simple (1-2 files), moderate (3-5 files), or complex (6+ files)?
+3. **Break Into Phases**: Divide the work into logical phases that can be validated independently.
+4. **List Dependencies**: What libraries/packages will be needed?
+
+## OUTPUT FORMAT (JSON only)
+
+{
+  "summary": "One-line summary of what will be built",
+  "reasoning": "Explain your understanding of the request and approach",
+  "estimatedComplexity": "simple" | "moderate" | "complex",
+  "suggestedDependencies": ["package-name", ...],
+  "phases": [
+    {
+      "id": "phase-1",
+      "name": "Phase 1: Foundation",
+      "description": "What this phase accomplishes",
+      "filesToCreate": ["src/components/..."],
+      "filesToModify": ["src/App.tsx"],
+      "validationCriteria": ["App renders without errors", "Component is visible"]
+    },
+    ...more phases
+  ]
+}
+
+## PHASE DESIGN RULES
+
+1. Each phase should be independently testable
+2. Phase 1 should always create the basic structure that renders
+3. Later phases add features incrementally
+4. For games: Phase 1 = rendering, Phase 2 = input/physics, Phase 3 = game logic, Phase 4 = polish
+5. For apps: Phase 1 = layout/structure, Phase 2 = data/state, Phase 3 = interactivity, Phase 4 = polish
+
+## EXAMPLES
+
+User: "Build a Flappy Bird clone"
+→ Phase 1: Canvas & Bird rendering
+→ Phase 2: Jump physics & gravity
+→ Phase 3: Pipe obstacles & collision
+→ Phase 4: Scoring, game over, restart
+→ Phase 5: Sound effects, animations, polish
+
+User: "Create a money tracker"
+→ Phase 1: Dashboard layout with totals
+→ Phase 2: Add transaction form
+→ Phase 3: Transaction list with edit/delete
+→ Phase 4: Categories & filtering
+→ Phase 5: Charts & data visualization
+
+## CURRENT PROJECT FILES
+${projectFiles?.map((f: { path: string }) => '- ' + f.path).join('\n') || 'Empty project'}
+
+## USER REQUEST
+${prompt}
+
+Respond with ONLY the JSON plan, no additional text.`;
+
+      const planResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: planningPrompt }] }],
+            generationConfig: {
+              temperature: 0.5,
+              maxOutputTokens: 4096,
+            },
+          }),
+        }
+      );
+
+      if (!planResponse.ok) {
+        throw new Error(`Gemini API error: ${planResponse.status}`);
+      }
+
+      const planData = await planResponse.json();
+      const planText = planData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+      // Extract JSON from response
+      const jsonMatch = planText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Failed to parse planning response");
+      }
+
+      const plan = JSON.parse(jsonMatch[0]);
+
+      // Add IDs to phases if not present
+      if (plan.phases) {
+        plan.phases = plan.phases.map((phase: any, index: number) => ({
+          ...phase,
+          id: phase.id || `phase-${index + 1}`,
+          status: 'pending'
+        }));
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, plan }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     let messages;
     let systemInstruction;
 
@@ -370,55 +484,100 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
 
       // CRITICAL: Environment context preamble with MODIFY-not-REPLACE rule
       const environmentContext = `
-=== CRITICAL RULES ===
+        === CRITICAL RULES ===
 
-1. MODIFY, DON'T REPLACE: You are modifying an EXISTING React application.
-   - NEVER delete existing components that the user didn't mention
-   - ADD new features to the existing code
-   - PRESERVE the existing design, styling, and structure
-   
-2. If user says "add X", add X to the existing code - don't create a brand new page
+          1. MODIFY, DON'T REPLACE: You are modifying an EXISTING React application.
+            - NEVER delete existing components that the user didn't mention
+              - ADD new features to the existing code
+                - PRESERVE the existing design, styling, and structure
 
-3. PRESERVE EXISTING CODE: Look at the "CURRENT CODE" section below. 
+      2. If user says "add X", add X to the existing code - don't create a brand new page
+
+      3. PRESERVE EXISTING CODE: Look at the "CURRENT CODE" section below. 
    - Keep the existing App component structure
-   - Keep existing CSS classes, shadows, styling
-   - Keep existing navigation/layout
-   - Only ADD or MODIFY the specific parts the user asked for
+        - Keep existing CSS classes, shadows, styling
+          - Keep existing navigation / layout
+            - Only ADD or MODIFY the specific parts the user asked for
 
-=== FILE STRUCTURE (REQUIRED) ===
-- Pages go in: src/pages/PageName.tsx
-- Components go in: src/components/ComponentName.tsx  
-- Hooks go in: src/hooks/useHookName.ts
-- Utils go in: src/utils/utilName.ts
-- App.tsx should ONLY import and compose components, not contain all logic
+=== FILE STRUCTURE(REQUIRED) ===
+        - Pages go in: src / pages / PageName.tsx
+          - Components go in: src / components / ComponentName.tsx
+            - Hooks go in: src / hooks / useHookName.ts
+              - Utils go in: src / utils / utilName.ts
+                - App.tsx should ONLY import and compose components, not contain all logic
 
-=== WHEN TO CREATE NEW FILES ===
-- New page requested → CREATE src/pages/PageName.tsx
-- New reusable component → CREATE src/components/ComponentName.tsx
-- Custom hook needed → CREATE src/hooks/useHookName.ts
-- ALWAYS return MULTIPLE files in the "files" array when creating features
+                  === WHEN TO CREATE NEW FILES ===
+                    - New page requested → CREATE src / pages / PageName.tsx
+                      - New reusable component → CREATE src / components / ComponentName.tsx
+                        - Custom hook needed → CREATE src / hooks / useHookName.ts
+                          - ALWAYS return MULTIPLE files in the "files" array when creating features
 
-=== TECH STACK ===
-- React 18 with TypeScript
-- Tailwind CSS (ALL classes available)
-- useState/useEffect for state
+                            === TECH STACK ===
+                              - React 18 with TypeScript
+                              - Tailwind CSS(ALL classes available)
+                                - useState / useEffect for state
 
-=== COMPLETE LIBRARY REFERENCE ===
 
-=== COMPLETE LIBRARY REFERENCE ===
+                                  === COMPLETE LIBRARY REFERENCE ===
 
 ✅ INSTALLED & READY TO USE:
 
+      ROUTING:
+      - react - router - dom: Full routing support for multi - page apps
+  import { BrowserRouter, Routes, Route, Link, useNavigate, useParams } from 'react-router-dom';
+  
+  Example App.tsx with routing:
+      \`\`\`tsx
+  import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+  import HomePage from './pages/HomePage';
+  import AboutPage from './pages/AboutPage';
+  
+  function App() {
+    return (
+      <BrowserRouter>
+        <nav><Link to="/">Home</Link> | <Link to="/about">About</Link></nav>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+  \`\`\`
+
 UI COMPONENTS:
-- lucide-react: Icons
-- @radix-ui/*: Headless UI primitives
+- lucide-react: Icons (Home, Settings, User, ChevronRight, etc.)
+- @radix-ui/*: Full Radix UI suite including:
+  - Dialog, Dropdown, Tabs, Tooltip, Accordion, Switch
+  - Checkbox, Select, Slider, Progress, Avatar
+  - RadioGroup, Label, Popover, ScrollArea, Separator
+  - Toggle, ContextMenu, HoverCard, Menubar, NavigationMenu
+  - AlertDialog, AspectRatio, Collapsible
 - class-variance-authority, clsx, tailwind-merge
 
 3D & GRAPHICS:
 - three, @react-three/fiber, @react-three/drei:
+  CRITICAL: ALWAYS include lights in 3D scenes or the canvas will be black!
+  \`\`\`tsx
   import { Canvas } from '@react-three/fiber';
-  import { OrbitControls, Sphere } from '@react-three/drei';
-  <Canvas><OrbitControls /><Sphere /></Canvas>
+  import { OrbitControls } from '@react-three/drei';
+  
+  function Scene() {
+    return (
+      <Canvas>
+        {/* REQUIRED: Add lights or objects won't be visible */}
+        <ambientLight intensity={0.5} />
+        <pointLight position={[10, 10, 10]} />
+        <OrbitControls />
+        <mesh>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="hotpink" />
+        </mesh>
+      </Canvas>
+    );
+  }
+  \`\`\`
+
 
 ANIMATION:
 - framer-motion:
@@ -428,18 +587,18 @@ CHARTS:
 - recharts:
   import { LineChart, BarChart, PieChart } from 'recharts';
 
-DATA & RESEARCH (INTERNET ACCESS SIMULATION):
-- axios & native fetch:
-  You have "internet access" via public APIs.
-  - Weather: https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m
-  - Crypto: https://api.coincap.io/v2/assets
-  - Jokes: https://official-joke-api.appspot.com/random_joke
-  - IP Info: https://ipapi.co/json/
-  
-  When user asks for "Research" or "Real Data":
-  1. Identify a public API (no key required preferred)
-  2. Create a React component that fetches this data using useEffect + axios/fetch
-  3. Display it beautifully
+HTTP & DATA FETCHING:
+- axios: HTTP client for API calls
+  import axios from 'axios';
+  const { data } = await axios.get('https://api.example.com/data');
+- @tanstack/react-query: Data fetching & caching
+- native fetch: Also available
+
+PUBLIC APIs (no key required):
+- Weather: https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m
+- Crypto: https://api.coincap.io/v2/assets
+- Jokes: https://official-joke-api.appspot.com/random_joke
+- IP Info: https://ipapi.co/json/
 
 DATES:
 - date-fns: format, parseISO, etc.
@@ -447,13 +606,19 @@ DATES:
 STATE:
 - zustand: Global state management
 
-FORMS:
-- react-hook-form + zod
+FORMS & VALIDATION:
+- react-hook-form: Form state management
+- zod: Schema validation
+- @hookform/resolvers: Zod resolver for react-hook-form
 
 NOTIFICATIONS:
-- sonner
+- sonner: Toast notifications
+
+DRAG & DROP:
+- @dnd-kit/core, @dnd-kit/sortable, @dnd-kit/utilities
 
 ❌ NOT INSTALLED - DO NOT USE:
+
 
 MAPS (do NOT import - use window.L instead, see MAPS section below):
 - import 'leaflet' ❌ (use window.L instead)

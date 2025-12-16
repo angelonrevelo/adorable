@@ -38,7 +38,7 @@ export async function* generateVibeStream(
   const startTime = Date.now();
 
   // Smart file selection - only send relevant files
-  const relevantFiles = projectFiles 
+  const relevantFiles = projectFiles
     ? selectRelevantFiles(projectFiles, prompt, conversationHistory, 15)
     : [];
 
@@ -62,7 +62,7 @@ export async function* generateVibeStream(
     yield { type: 'error', error: 'Supabase configuration missing' };
     return;
   }
-  
+
   // Log files being sent
   relevantFiles.forEach(f => {
     sysConsole.logFileRead(f.path, f.content.length);
@@ -75,9 +75,9 @@ export async function* generateVibeStream(
       projectFiles: filesContext,
       type: 'generate-stream'
     });
-    
+
     sysConsole.logApiRequest('generate-vibe (stream)', bodyPayload.length);
-    
+
     const response = await fetch(`${supabaseUrl}/functions/v1/generate-vibe`, {
       method: 'POST',
       headers: {
@@ -117,7 +117,7 @@ export async function* generateVibeStream(
         if (line.startsWith('data: ')) {
           try {
             const event = JSON.parse(line.slice(6)) as StreamEvent;
-            
+
             // Log streaming events
             if (event.type === 'thinking') {
               sysConsole.logSystem('AI started thinking...');
@@ -131,7 +131,7 @@ export async function* generateVibeStream(
                 sysConsole.logAIResponse(event.message || 'Done', event.files.length);
               }
             }
-            
+
             yield event;
           } catch (e) {
             sysConsole.logError('Failed to parse SSE event', e instanceof Error ? e : undefined);
@@ -167,7 +167,7 @@ export async function generateVibe(
   const sysConsole = getSysConsole();
 
   // Smart file selection - only send relevant files  
-  const relevantFiles = projectFiles 
+  const relevantFiles = projectFiles
     ? selectRelevantFiles(projectFiles, prompt, conversationHistory, 15)
     : [];
 
@@ -193,7 +193,7 @@ export async function generateVibe(
 
   if (error) {
     console.error('Error calling generate-vibe:', error);
-    
+
     // Better error messages for common issues
     const errorMsg = error.message || '';
     if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError') || errorMsg.includes('network')) {
@@ -205,7 +205,7 @@ export async function generateVibe(
     if (errorMsg.includes('GEMINI_API_KEY') || errorMsg.includes('API key')) {
       throw new Error('AI service not configured - please check the GEMINI_API_KEY in Supabase secrets');
     }
-    
+
     throw new Error(error.message || 'Failed to generate code');
   }
 
@@ -347,3 +347,56 @@ export async function generateRandomIdea(): Promise<string> {
   return data.idea || 'Build something amazing!';
 }
 
+// Generate an execution plan for Plan Mode
+export interface AgentPlanResponse {
+  id: string;
+  summary: string;
+  reasoning: string;
+  phases: Array<{
+    id: string;
+    name: string;
+    description: string;
+    status: 'pending' | 'in-progress' | 'complete' | 'failed';
+    filesToCreate: string[];
+    filesToModify: string[];
+    validationCriteria: string[];
+  }>;
+  estimatedComplexity: 'simple' | 'moderate' | 'complex';
+  suggestedDependencies: string[];
+}
+
+export async function generatePlan(
+  prompt: string,
+  projectFiles?: ProjectFile[]
+): Promise<AgentPlanResponse> {
+  const sysConsole = getSysConsole();
+  sysConsole.logSystem('Generating execution plan...');
+
+  const { data, error } = await supabase.functions.invoke('generate-vibe', {
+    body: {
+      type: 'generate-plan',
+      prompt,
+      projectFiles: projectFiles?.map(f => ({
+        path: f.path,
+        content: f.content.slice(0, 10000) // Limit for planning
+      }))
+    }
+  });
+
+  if (error) {
+    console.error('Error generating plan:', error);
+    throw new Error(error.message || 'Failed to generate plan');
+  }
+
+  if (!data.success || !data.plan) {
+    throw new Error(data.error || 'Failed to generate plan');
+  }
+
+  sysConsole.logSystem(`Plan generated: ${data.plan.phases?.length || 0} phases`);
+
+  // Add unique ID to plan
+  return {
+    id: `plan-${Date.now()}`,
+    ...data.plan
+  };
+}

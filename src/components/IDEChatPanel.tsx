@@ -21,10 +21,12 @@ import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
 import { useConsoleStore } from '@/stores/useConsoleStore';
 import { templates } from '@/templates/projectTemplates';
-import { generateVibe, generateVibeStream, generateRandomIdea } from '@/services/geminiService';
+import { generateVibe, generateVibeStream, generateRandomIdea, generatePlan } from '@/services/geminiService';
 import { selectRelevantFiles, getRecentlyModifiedPaths } from '@/services/fileSelectionService';
 import { ConversationMessage } from '@/types/projectTypes';
 import { ConfirmChangesPanel } from './ConfirmChangesPanel';
+import { AgentModeToggle } from './AgentModeToggle';
+import { AgentPlanPanel } from './AgentPlanPanel';
 
 interface Attachment {
     id: string;
@@ -53,6 +55,13 @@ export function IDEChatPanel() {
         setPendingChanges,
         confirmPendingChanges,
         rejectPendingChanges,
+        agentMode,
+        setAgentMode,
+        isPlanning,
+        setIsPlanning,
+        setAgentPlan,
+        agentPlan,
+        updatePhaseStatus,
     } = useProjectStore();
 
     const { logSystem, logError, logFileWrite } = useConsoleStore();
@@ -79,6 +88,7 @@ export function IDEChatPanel() {
     const [lastErrorHash, setLastErrorHash] = useState<string | null>(null);
     const [retryCooldownUntil, setRetryCooldownUntil] = useState<number>(0);
     const [showContextInfo, setShowContextInfo] = useState(false);
+    const [executingPhaseIndex, setExecutingPhaseIndex] = useState<number>(-1);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +151,43 @@ export function IDEChatPanel() {
         projectFiles.forEach(file => {
             addReading(file.path.split('/').pop() || file.path);
         });
+
+        // =====================
+        // PLAN MODE: Generate plan first
+        // =====================
+        if (agentMode === 'plan') {
+            setIsPlanning(true);
+            try {
+                logSystem('Plan Mode: Generating execution plan...');
+                const plan = await generatePlan(userInput, projectFiles);
+
+                setAgentPlan(plan);
+
+                addMessage({
+                    role: 'assistant',
+                    content: `I've created a plan with ${plan.phases.length} phases for: "${plan.summary}". Review the plan below and click Execute to proceed.`,
+                    thought: plan.reasoning,
+                });
+
+                logSystem(`Plan generated: ${plan.phases.length} phases, complexity: ${plan.estimatedComplexity}`);
+            } catch (error) {
+                console.error('Error generating plan:', error);
+                logError('Planning failed', error instanceof Error ? error : undefined);
+                addMessage({
+                    role: 'assistant',
+                    content: 'Sorry, there was an error creating the plan. Please try again.',
+                });
+            } finally {
+                setIsPlanning(false);
+                setGenerating(false);
+                endSession();
+            }
+            return;
+        }
+
+        // =====================
+        // INSTANT MODE: Stream directly
+        // =====================
 
         // Pass full conversation history (with file operations for context)
         const history = messages;
@@ -246,7 +293,7 @@ export function IDEChatPanel() {
             setGenerating(false);
             endSession();
         }
-    }, [input, isGenerating, messages, files, addMessage, setGenerating, setPendingChanges, startSession, endSession, startThinking, stopThinking, addReading, addEditing, addExplaining, addError, attachments, knowledgeInput, logSystem, logError]);
+    }, [input, isGenerating, messages, files, addMessage, setGenerating, setPendingChanges, startSession, endSession, startThinking, stopThinking, addReading, addEditing, addExplaining, addError, attachments, knowledgeInput, logSystem, logError, agentMode, setIsPlanning, setAgentPlan]);
 
     // Handle Fix error button click
     const handleFixError = useCallback(async () => {
@@ -290,6 +337,104 @@ export function IDEChatPanel() {
             setGenerating(false);
         }
     }, [sandpackError, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations, clearSandpackError]);
+
+    // Handle executing plan phases sequentially
+    const handleExecutePlan = useCallback(async () => {
+        if (!agentPlan || isGenerating) return;
+
+        // Cache plan data to avoid stale closure issues
+        const phases = [...agentPlan.phases];
+        const planSummary = agentPlan.summary;
+        const phaseCount = phases.length;
+
+        logSystem(`Executing plan: ${phaseCount} phases - ${planSummary}`);
+        setGenerating(true);
+        startSession();
+
+        const projectFiles = Array.from(files.values());
+
+        try {
+            for (let i = 0; i < phaseCount; i++) {
+                const phase = phases[i];
+                setExecutingPhaseIndex(i);
+                updatePhaseStatus(phase.id, 'in-progress');
+
+                logSystem(`Phase ${i + 1}/${phaseCount}: ${phase.name}`);
+
+                // Build phase-specific prompt
+                const phasePrompt = `
+Execute Phase ${i + 1}: ${phase.name}
+
+Description: ${phase.description}
+
+Files to create: ${phase.filesToCreate.join(', ') || 'None'}
+Files to modify: ${phase.filesToModify.join(', ') || 'None'}
+
+Validation criteria:
+${phase.validationCriteria.map(c => `- ${c}`).join('\n')}
+
+IMPORTANT: This is part of a larger plan. Execute ONLY this phase. Make the code production-ready with proper styling, animations, and error handling.
+`.trim();
+
+                addMessage({
+                    role: 'user',
+                    content: `Executing: ${phase.name}`,
+                });
+
+                let phaseFiles: any[] = [];
+                let phaseThought = '';
+                let phaseMessage = '';
+
+                // Execute the phase
+                for await (const event of generateVibeStream(phasePrompt, messages, projectFiles, '')) {
+                    if (event.type === 'done') {
+                        phaseFiles = event.files || [];
+                        phaseThought = event.thought || '';
+                        phaseMessage = event.message || '';
+                    } else if (event.type === 'error') {
+                        throw new Error(event.error || 'Phase execution failed');
+                    }
+                }
+
+                // Apply files immediately for each phase
+                if (phaseFiles.length > 0) {
+                    applyFileOperations(phaseFiles);
+                    logSystem(`Phase ${i + 1} complete: ${phaseFiles.length} files modified`);
+                }
+
+                addMessage({
+                    role: 'assistant',
+                    content: phaseMessage || `Completed: ${phase.name}`,
+                    thought: phaseThought,
+                    fileOperations: phaseFiles,
+                });
+
+                updatePhaseStatus(phase.id, 'complete');
+
+                // Small delay between phases for UI feedback
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            logSystem('All phases complete!');
+            addMessage({
+                role: 'assistant',
+                content: `✅ Plan executed successfully! All ${phaseCount} phases complete.`,
+            });
+
+        } catch (error) {
+            console.error('Phase execution error:', error);
+            logError('Phase execution failed', error instanceof Error ? error : undefined);
+            addMessage({
+                role: 'assistant',
+                content: `❌ Error during phase execution: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            });
+        } finally {
+            setExecutingPhaseIndex(-1);
+            setAgentPlan(null);
+            setGenerating(false);
+            endSession();
+        }
+    }, [agentPlan, isGenerating, files, messages, addMessage, setGenerating, applyFileOperations, updatePhaseStatus, setAgentPlan, logSystem, logError, startSession, endSession]);
 
     // Auto error recovery loop - with improved loop prevention
     useEffect(() => {
@@ -464,8 +609,13 @@ export function IDEChatPanel() {
                     <Sparkles className="w-5 h-5 text-yellow-400" />
                     <h1 className="font-semibold text-white">Adorable</h1>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500 truncate max-w-[120px]">
+                <div className="flex items-center gap-3">
+                    <AgentModeToggle
+                        mode={agentMode}
+                        onModeChange={setAgentMode}
+                        disabled={isGenerating || isPlanning}
+                    />
+                    <span className="text-xs text-gray-500 truncate max-w-[100px]">
                         {project.name}
                     </span>
                 </div>
@@ -603,6 +753,20 @@ export function IDEChatPanel() {
                                 }}
                             />
                         )}
+
+                        {/* Agent Plan Approval */}
+                        {agentPlan && (
+                            <AgentPlanPanel
+                                plan={agentPlan}
+                                currentPhaseIndex={executingPhaseIndex}
+                                isExecuting={executingPhaseIndex >= 0}
+                                onExecute={handleExecutePlan}
+                                onReject={() => {
+                                    logSystem('User rejected plan');
+                                    setAgentPlan(null);
+                                }}
+                            />
+                        )}
                         <div ref={messagesEndRef} />
                     </>
                 )}
@@ -681,8 +845,8 @@ export function IDEChatPanel() {
                         <div className="text-gray-400 mb-1">Files in context:</div>
                         <div className="flex flex-wrap gap-1">
                             {contextInfo.fileNames.slice(0, 10).map((name, i) => (
-                                <span 
-                                    key={i} 
+                                <span
+                                    key={i}
                                     className={cn(
                                         "px-1.5 py-0.5 rounded text-xs",
                                         contextInfo.recentlyModified.some(p => p.endsWith(name))

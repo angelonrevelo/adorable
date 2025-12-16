@@ -1,5 +1,7 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Project, ProjectFile, FileTreeNode, ConversationMessage, FileOperation } from '@/types/projectTypes';
+import type { AgentMode, AgentPlan, AgentPhase } from '@/types/agentTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 // Helper to get language from file path
@@ -100,9 +102,15 @@ interface ProjectStore {
 
     // Pending changes for confirmation
     pendingChanges: PendingChanges | null;
-    
+
     // AI Plan state
     currentPlan: AIPlan | null;
+
+    // Agent mode state
+    agentMode: AgentMode;
+    agentPlan: AgentPlan | null;
+    currentPhaseIndex: number;
+    isPlanning: boolean;
 
     // Project actions
     createProject: (name: string, templateFiles?: Omit<ProjectFile, 'id'>[]) => void;
@@ -135,11 +143,18 @@ interface ProjectStore {
     setPendingChanges: (changes: PendingChanges | null) => void;
     confirmPendingChanges: () => void;
     rejectPendingChanges: () => void;
-    
+
     // Plan actions
     setCurrentPlan: (plan: AIPlan | null) => void;
     approvePlan: () => void;
     rejectPlan: () => void;
+
+    // Agent mode actions
+    setAgentMode: (mode: AgentMode) => void;
+    setAgentPlan: (plan: AgentPlan | null) => void;
+    setCurrentPhaseIndex: (index: number) => void;
+    setIsPlanning: (isPlanning: boolean) => void;
+    updatePhaseStatus: (phaseId: string, status: AgentPhase['status']) => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -154,6 +169,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     sandpackError: null,
     pendingChanges: null,
     currentPlan: null,
+
+    // Agent mode initial state
+    agentMode: 'instant' as AgentMode,
+    agentPlan: null,
+    currentPhaseIndex: 0,
+    isPlanning: false,
 
     // Project actions
     createProject: (name, templateFiles) => {
@@ -399,18 +420,45 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     rejectPendingChanges: () => {
         set({ pendingChanges: null });
     },
-    
+
     // Plan actions
     setCurrentPlan: (plan) => {
         set({ currentPlan: plan });
     },
-    
+
     approvePlan: () => {
         // Plan approved - execution will be handled by the chat panel
         // Just clear the plan state
     },
-    
+
     rejectPlan: () => {
         set({ currentPlan: null });
+    },
+
+    // Agent mode actions
+    setAgentMode: (mode) => {
+        set({ agentMode: mode });
+    },
+
+    setAgentPlan: (plan) => {
+        set({ agentPlan: plan, currentPhaseIndex: 0 });
+    },
+
+    setCurrentPhaseIndex: (index) => {
+        set({ currentPhaseIndex: index });
+    },
+
+    setIsPlanning: (isPlanning) => {
+        set({ isPlanning });
+    },
+
+    updatePhaseStatus: (phaseId, status) => {
+        const { agentPlan } = get();
+        if (agentPlan) {
+            const updatedPhases = agentPlan.phases.map(phase =>
+                phase.id === phaseId ? { ...phase, status } : phase
+            );
+            set({ agentPlan: { ...agentPlan, phases: updatedPhases } });
+        }
     },
 }));

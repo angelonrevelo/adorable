@@ -211,7 +211,7 @@ function PreviewContent() {
                             ✕
                         </button>
                     </div>
-                    
+
                     {/* Console content */}
                     <div className="flex-1 overflow-hidden">
                         {consoleTab === 'system' ? (
@@ -297,13 +297,28 @@ export function PreviewPanel() {
                         dependencies: {
                             'react': '^18.2.0',
                             'react-dom': '^18.2.0',
+                            // Routing - Full support for multi-page apps
+                            'react-router-dom': '^6.20.0',
+                            // Icons
                             'lucide-react': '^0.294.0',
-                            // Lovable Stack - common libraries AI will use
+                            // Styling utilities
                             'clsx': '^2.0.0',
                             'tailwind-merge': '^2.0.0',
+                            'class-variance-authority': '^0.7.0',
+                            // Animation
                             'framer-motion': '^10.16.4',
+                            // 3D Graphics
+                            'three': '^0.160.0',
+                            '@react-three/fiber': '^8.15.16',
+                            '@react-three/drei': '^9.99.0',
+                            // HTTP & Data Fetching
+                            'axios': '^1.6.0',
+                            '@tanstack/react-query': '^5.0.0',
+                            // Date utilities
                             'date-fns': '^2.30.0',
+                            // Charts
                             'recharts': '^2.9.0',
+                            // Radix UI Primitives - Full suite
                             '@radix-ui/react-slot': '^1.0.2',
                             '@radix-ui/react-dialog': '^1.0.5',
                             '@radix-ui/react-dropdown-menu': '^2.0.0',
@@ -311,27 +326,39 @@ export function PreviewPanel() {
                             '@radix-ui/react-tooltip': '^1.0.7',
                             '@radix-ui/react-accordion': '^1.1.2',
                             '@radix-ui/react-switch': '^1.0.3',
-                            'class-variance-authority': '^0.7.0',
-                            'uuid': '^9.0.0',
-                            // State Management
-                            'zustand': '^4.4.0',
-                            // Validation
-                            'zod': '^3.22.0',
-                            // Data Fetching
-                            '@tanstack/react-query': '^5.0.0',
-                            // Notifications
-                            'sonner': '^1.0.0',
-                            // Forms
-                            'react-hook-form': '^7.48.0',
-                            // Drag & Drop
-                            '@dnd-kit/core': '^6.1.0',
-                            '@dnd-kit/sortable': '^7.0.0',
-                            // Additional Radix UI
                             '@radix-ui/react-checkbox': '^1.0.4',
                             '@radix-ui/react-select': '^2.0.0',
                             '@radix-ui/react-slider': '^1.1.2',
                             '@radix-ui/react-progress': '^1.0.3',
                             '@radix-ui/react-avatar': '^1.0.4',
+                            '@radix-ui/react-radio-group': '^1.1.3',
+                            '@radix-ui/react-label': '^2.0.2',
+                            '@radix-ui/react-popover': '^1.0.7',
+                            '@radix-ui/react-scroll-area': '^1.0.5',
+                            '@radix-ui/react-separator': '^1.0.3',
+                            '@radix-ui/react-toggle': '^1.0.3',
+                            '@radix-ui/react-toggle-group': '^1.0.4',
+                            '@radix-ui/react-context-menu': '^2.1.5',
+                            '@radix-ui/react-hover-card': '^1.0.7',
+                            '@radix-ui/react-menubar': '^1.0.4',
+                            '@radix-ui/react-navigation-menu': '^1.1.4',
+                            '@radix-ui/react-alert-dialog': '^1.0.5',
+                            '@radix-ui/react-aspect-ratio': '^1.0.3',
+                            '@radix-ui/react-collapsible': '^1.0.3',
+                            // Utilities
+                            'uuid': '^9.0.0',
+                            // State Management
+                            'zustand': '^4.4.0',
+                            // Validation & Forms
+                            'zod': '^3.22.0',
+                            'react-hook-form': '^7.48.0',
+                            '@hookform/resolvers': '^3.3.0',
+                            // Notifications
+                            'sonner': '^1.0.0',
+                            // Drag & Drop
+                            '@dnd-kit/core': '^6.1.0',
+                            '@dnd-kit/sortable': '^7.0.0',
+                            '@dnd-kit/utilities': '^3.2.0',
                         },
                         entry: '/src/main.tsx',
                     }}
