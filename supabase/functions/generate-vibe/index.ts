@@ -217,6 +217,13 @@ You MUST respond with this exact JSON structure:
     - Show user-friendly error messages
     - Provide retry mechanisms for failed operations
     - Log errors for debugging
+14. **ANTI-HALLUCINATION**: NEVER reference files that don't exist!
+    - DO NOT use: background.png, pipe.png, bird.png, logo.svg, photo.jpg
+    - DO NOT import: import logo from './logo.svg'
+    - DO NOT assume images exist in public folder
+    - FOR GAMES: Use Canvas API to draw shapes, NOT image files
+    - FOR PLACEHOLDERS: Use https://image.pollinations.ai/prompt/description
+    - Use Tailwind CSS classes and gradients for styling, NOT custom images
 
 ## PROMPT VERSION: ${PROMPT_VERSION}`;
 
