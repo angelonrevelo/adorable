@@ -96,40 +96,7 @@ export function IDEChatPanel() {
         }
     }, [input]);
 
-    // Auto error recovery loop - with improved loop prevention
-    useEffect(() => {
-        // Don't retry if currently generating or in cooldown
-        const now = Date.now();
-        if (!sandpackError || isGenerating || now < retryCooldownUntil) {
-            return;
-        }
-
-        // Create a hash of the error to detect if it's the same error repeating
-        const errorHash = sandpackError.slice(0, 100);
-
-        // If it's a different error, reset the counter
-        if (errorHash !== lastErrorHash) {
-            setLastErrorHash(errorHash);
-            setAutoRetryCount(0);
-        }
-
-        // Check if we can retry
-        if (autoRetryCount < MAX_AUTO_RETRIES) {
-            const timer = setTimeout(() => {
-                setAutoRetryCount(prev => prev + 1);
-                handleFixError();
-            }, 1500);
-            return () => clearTimeout(timer);
-        } else {
-            // Max retries reached, enter cooldown
-            setRetryCooldownUntil(Date.now() + RETRY_COOLDOWN_MS);
-        }
-        // Reset when error is cleared
-        if (!sandpackError) {
-            setAutoRetryCount(0);
-            setLastErrorHash(null);
-        }
-    }, [sandpackError, isGenerating, autoRetryCount, lastErrorHash, retryCooldownUntil, handleFixError]); // Added handleFixError to dependency array
+    
 
     const handleSend = useCallback(async (e?: React.FormEvent) => {
         e?.preventDefault(); // Prevent default form submission if called from form
@@ -303,6 +270,41 @@ export function IDEChatPanel() {
             setGenerating(false);
         }
     }, [sandpackError, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations, clearSandpackError]);
+
+    // Auto error recovery loop - with improved loop prevention
+    useEffect(() => {
+        // Don't retry if currently generating or in cooldown
+        const now = Date.now();
+        if (!sandpackError || isGenerating || now < retryCooldownUntil) {
+            return;
+        }
+
+        // Create a hash of the error to detect if it's the same error repeating
+        const errorHash = sandpackError.slice(0, 100);
+
+        // If it's a different error, reset the counter
+        if (errorHash !== lastErrorHash) {
+            setLastErrorHash(errorHash);
+            setAutoRetryCount(0);
+        }
+
+        // Check if we can retry
+        if (autoRetryCount < MAX_AUTO_RETRIES) {
+            const timer = setTimeout(() => {
+                setAutoRetryCount(prev => prev + 1);
+                handleFixError();
+            }, 1500);
+            return () => clearTimeout(timer);
+        } else {
+            // Max retries reached, enter cooldown
+            setRetryCooldownUntil(Date.now() + RETRY_COOLDOWN_MS);
+        }
+        // Reset when error is cleared
+        if (!sandpackError) {
+            setAutoRetryCount(0);
+            setLastErrorHash(null);
+        }
+    }, [sandpackError, isGenerating, autoRetryCount, lastErrorHash, retryCooldownUntil, handleFixError]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
