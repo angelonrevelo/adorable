@@ -14,7 +14,8 @@ import {
     Wrench,
     BookOpen,
     FileText,
-    Eye
+    Eye,
+    Activity
 } from 'lucide-react';
 import { useActivityStore } from '@/stores/useActivityStore';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ import { ConversationMessage } from '@/types/projectTypes';
 import { ConfirmChangesPanel } from './ConfirmChangesPanel';
 import { AgentModeToggle } from './AgentModeToggle';
 import { AgentPlanPanel } from './AgentPlanPanel';
+import { EdgeLogsPanel, EdgeLogsData } from './EdgeLogsPanel';
 
 interface Attachment {
     id: string;
@@ -90,6 +92,8 @@ export function IDEChatPanel() {
     const [showContextInfo, setShowContextInfo] = useState(false);
     const [executingPhaseIndex, setExecutingPhaseIndex] = useState<number>(-1);
     const [consoleHistory, setConsoleHistory] = useState<string[]>([]);
+    const [edgeLogs, setEdgeLogs] = useState<EdgeLogsData | null>(null);
+    const [showEdgeLogs, setShowEdgeLogs] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -287,6 +291,15 @@ export function IDEChatPanel() {
                         thought = event.thought || '';
                         message = event.message || 'Generated successfully';
                         resultFiles = event.files || [];
+
+                        // Capture edge function logs
+                        if (event._logs) {
+                            setEdgeLogs(event._logs as EdgeLogsData);
+                            // Auto-show logs if there are errors
+                            if (event._logs.summary?.errors > 0) {
+                                setShowEdgeLogs(true);
+                            }
+                        }
 
                         // Add AI's explanation
                         if (thought) {
@@ -1027,6 +1040,22 @@ CRITICAL INSTRUCTIONS:
                             >
                                 <BookOpen className="w-4 h-4" />
                             </button>
+                            {/* Edge Logs toggle */}
+                            <button
+                                onClick={() => setShowEdgeLogs(!showEdgeLogs)}
+                                className={cn(
+                                    'p-2 rounded-lg transition-colors relative',
+                                    showEdgeLogs
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                )}
+                                title="View Edge Function Logs"
+                            >
+                                <Activity className="w-4 h-4" />
+                                {edgeLogs && edgeLogs.summary?.errors > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                                )}
+                            </button>
                         </div>
 
                         {/* Right side actions */}
@@ -1048,6 +1077,12 @@ CRITICAL INSTRUCTIONS:
                     </div>
                 </div>
 
+                {/* Edge Function Logs Panel */}
+                <EdgeLogsPanel
+                    logs={edgeLogs}
+                    isVisible={showEdgeLogs}
+                    onToggle={() => setShowEdgeLogs(!showEdgeLogs)}
+                />
 
             </div>
         </div>

@@ -228,6 +228,157 @@ You MUST respond with this exact JSON structure:
 ## PROMPT VERSION: ${PROMPT_VERSION}`;
 
 // =====================
+// ENHANCED LOGGING SYSTEM
+// =====================
+
+interface LogEntry {
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  category: 'model' | 'validation' | 'code_change' | 'decision' | 'api' | 'context';
+  message: string;
+  data?: any;
+}
+
+class EdgeLogger {
+  private logs: LogEntry[] = [];
+  private startTime: number = Date.now();
+
+  log(level: LogEntry['level'], category: LogEntry['category'], message: string, data?: any) {
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      category,
+      message,
+      data
+    };
+    this.logs.push(entry);
+
+    // Also log to console for Supabase dashboard
+    const prefix = `[${category.toUpperCase()}]`;
+    if (level === 'error') {
+      console.error(prefix, message, data || '');
+    } else if (level === 'warn') {
+      console.warn(prefix, message, data || '');
+    } else {
+      console.log(prefix, message, data || '');
+    }
+  }
+
+  info(category: LogEntry['category'], message: string, data?: any) {
+    this.log('info', category, message, data);
+  }
+
+  warn(category: LogEntry['category'], message: string, data?: any) {
+    this.log('warn', category, message, data);
+  }
+
+  error(category: LogEntry['category'], message: string, data?: any) {
+    this.log('error', category, message, data);
+  }
+
+  debug(category: LogEntry['category'], message: string, data?: any) {
+    this.log('debug', category, message, data);
+  }
+
+  logModelSelection(selectedModel: string, reason: string, isComplex: boolean) {
+    this.info('model', `Selected model: ${selectedModel}`, {
+      reason,
+      isComplex,
+      availableModels: ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro']
+    });
+  }
+
+  logCodeChange(operation: 'create' | 'modify' | 'delete', filePath: string, oldContent?: string, newContent?: string) {
+    const data: any = { operation, filePath };
+
+    if (operation === 'modify' && oldContent && newContent) {
+      // Calculate simple diff statistics
+      const oldLines = oldContent.split('\n').length;
+      const newLines = newContent.split('\n').length;
+      const linesAdded = Math.max(0, newLines - oldLines);
+      const linesRemoved = Math.max(0, oldLines - newLines);
+
+      data.diff = {
+        oldLines,
+        newLines,
+        linesAdded,
+        linesRemoved,
+        changePercentage: oldLines > 0 ? Math.round((Math.abs(newLines - oldLines) / oldLines) * 100) : 100
+      };
+    }
+
+    this.info('code_change', `${operation.toUpperCase()}: ${filePath}`, data);
+  }
+
+  logDecision(decision: string, reasoning: string, alternatives?: string[]) {
+    this.info('decision', decision, {
+      reasoning,
+      alternatives: alternatives || [],
+      promptVersion: PROMPT_VERSION
+    });
+  }
+
+  logValidation(filesCount: number, issues: ValidationIssue[], selfCorrected: boolean = false) {
+    const errors = issues.filter(i => i.type === 'error').length;
+    const warnings = issues.filter(i => i.type === 'warning').length;
+
+    const message = selfCorrected
+      ? `Self-correction applied: ${issues.length} issues fixed`
+      : `Validation: ${filesCount} files, ${errors} errors, ${warnings} warnings`;
+
+    this.info('validation', message, {
+      filesCount,
+      errors,
+      warnings,
+      selfCorrected,
+      issues: issues.slice(0, 10) // Only first 10 to avoid huge logs
+    });
+  }
+
+  logContext(promptLength: number, historyLength: number, filesCount: number, selectedFilesCount: number) {
+    this.info('context', 'Context prepared for AI', {
+      promptLength,
+      historyMessages: historyLength,
+      totalFiles: filesCount,
+      selectedFiles: selectedFilesCount,
+      contextEfficiency: filesCount > 0 ? Math.round((selectedFilesCount / filesCount) * 100) + '%' : 'N/A'
+    });
+  }
+
+  getElapsedTime(): number {
+    return Date.now() - this.startTime;
+  }
+
+  getAllLogs(): LogEntry[] {
+    return this.logs;
+  }
+
+  getSummary() {
+    const errors = this.logs.filter(l => l.level === 'error').length;
+    const warnings = this.logs.filter(l => l.level === 'warn').length;
+    const decisions = this.logs.filter(l => l.category === 'decision').length;
+    const codeChanges = this.logs.filter(l => l.category === 'code_change').length;
+
+    return {
+      totalLogs: this.logs.length,
+      errors,
+      warnings,
+      decisions,
+      codeChanges,
+      elapsedTime: this.getElapsedTime(),
+      categories: {
+        model: this.logs.filter(l => l.category === 'model').length,
+        validation: this.logs.filter(l => l.category === 'validation').length,
+        code_change: this.logs.filter(l => l.category === 'code_change').length,
+        decision: this.logs.filter(l => l.category === 'decision').length,
+        api: this.logs.filter(l => l.category === 'api').length,
+        context: this.logs.filter(l => l.category === 'context').length,
+      }
+    };
+  }
+}
+
+// =====================
 // SELF-CORRECTION: Validate generated code
 // =====================
 
@@ -510,8 +661,16 @@ serve(async (req) => {
   try {
     const { prompt, history, type, projectFiles } = await req.json();
 
+    // Initialize enhanced logger for this request
+    const logger = new EdgeLogger();
+    logger.info('api', `Request received: ${type}`, {
+      promptLength: prompt?.length,
+      historyLength: history?.length,
+      filesCount: projectFiles?.length
+    });
+
     if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not configured");
+      logger.error('api', 'GEMINI_API_KEY is not configured');
       throw new Error("GEMINI_API_KEY is not configured");
     }
 
@@ -539,6 +698,20 @@ serve(async (req) => {
 
     let model = PRIMARY_MODEL;
     let modelAttemptCount = 0;
+
+    // Log model selection decision
+    const modelReason = isComplexTask
+      ? type === "generate-plan"
+        ? "Planning task requires deep reasoning"
+        : `Complex task detected: ${prompt?.length > 200 ? 'long prompt' : ''} ${prompt?.toLowerCase().includes('game') ? 'game development' : ''}`
+      : "Simple task, using fast model";
+
+    logger.logModelSelection(model, modelReason, isComplexTask);
+    logger.logDecision(
+      `Using ${model}`,
+      modelReason,
+      FALLBACK_MODELS
+    );
 
     console.log(`Selected model: ${model} (complex: ${isComplexTask})`);
 
@@ -655,6 +828,7 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
 
       if (projectFiles && projectFiles.length > 0) {
         console.log(`Processing ${projectFiles.length} files for context`);
+        logger.logContext(prompt?.length || 0, history?.length || 0, projectFiles.length, projectFiles.length);
         for (const file of projectFiles) {
           contextMessage += `\n--- ${file.path} ---\n${file.content}\n`;
         }
@@ -2730,6 +2904,20 @@ export default App;
     if (parsed.files && Array.isArray(parsed.files)) {
       debugLog.push(`[DEBUG] Processing ${parsed.files.length} files`);
 
+      // Log code changes with diffs
+      for (const file of parsed.files) {
+        const existingFile = projectFiles?.find((f: any) => f.path === file.path);
+        const operation = file.action === 'delete' ? 'delete' :
+                         existingFile ? 'modify' : 'create';
+
+        logger.logCodeChange(
+          operation,
+          file.path,
+          existingFile?.content,
+          file.content
+        );
+      }
+
       parsed.files = parsed.files.map((file: { path: string; content: string; action: string }) => {
         if (file.path.endsWith('.tsx') || file.path.endsWith('.jsx')) {
           let fixedContent = file.content;
@@ -2825,6 +3013,9 @@ export default App;
     if (parsed.files && Array.isArray(parsed.files) && type === 'generate-multifile') {
       const issues = validateGeneratedCode(parsed.files);
 
+      // Log validation results
+      logger.logValidation(parsed.files.length, issues, false);
+
       if (issues.length > 0) {
         const errorIssues = issues.filter(i => i.type === 'error');
         console.log(`Validation found ${issues.length} issues (${errorIssues.length} errors)`);
@@ -2853,20 +3044,26 @@ export default App;
 
             if (remainingErrors.length < errorIssues.length) {
               console.log(`Self-correction improved code: ${errorIssues.length} -> ${remainingErrors.length} errors`);
+              logger.logValidation(correctedFiles.length, remainingIssues, true);
+              logger.info('validation', `Self-correction success: ${errorIssues.length} -> ${remainingErrors.length} errors`);
               parsed.files = correctedFiles;
               parsed.message = `${parsed.message} (Auto-corrected ${errorIssues.length - remainingErrors.length} issues)`;
             } else {
               console.log("Self-correction did not improve code, keeping original");
+              logger.warn('validation', 'Self-correction did not improve code');
             }
           } catch (correctionError) {
             console.error("Self-correction failed:", correctionError);
+            logger.error('validation', 'Self-correction failed', correctionError);
             // Continue with original files
           }
         } else if (errorIssues.length > 10) {
           console.log("Too many errors for self-correction, returning original");
+          logger.warn('validation', `Too many errors (${errorIssues.length}) for self-correction`);
         }
       } else {
         console.log("Validation passed: No issues found ✓");
+        logger.info('validation', 'Validation passed: No issues found');
       }
     }
 
@@ -2878,10 +3075,23 @@ export default App;
       parsed._contextSent = "Check Supabase function logs for full context";
     }
 
+    // Add enhanced logs to ALL responses
+    parsed._logs = {
+      entries: logger.getAllLogs(),
+      summary: logger.getSummary(),
+      version: PROMPT_VERSION
+    };
+
+    logger.info('api', 'Request completed successfully', {
+      elapsedTime: logger.getElapsedTime(),
+      filesGenerated: parsed.files?.length || 0
+    });
+
     // CRITICAL DEBUG: Log final response before sending
     console.log("FINAL RESPONSE KEYS:", Object.keys(parsed));
     console.log("Has files:", !!parsed.files);
     console.log("Has html:", !!parsed.html);
+    console.log("Enhanced logs included:", !!parsed._logs);
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

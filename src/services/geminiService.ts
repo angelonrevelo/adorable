@@ -27,6 +27,7 @@ export interface StreamEvent {
   message?: string;
   files?: FileOperation[];
   error?: string;
+  _logs?: any; // Enhanced edge function logs
 }
 
 // Streaming generator function for SSE with smart file selection
