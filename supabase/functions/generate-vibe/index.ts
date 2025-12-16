@@ -775,24 +775,79 @@ serve(async (req) => {
       return false;
     };
 
+    // Detect vague modification prompts that might cause code deletion
+    const detectVagueModification = (text: string, hasExistingFiles: boolean): boolean => {
+      if (!hasExistingFiles) return false; // Only apply if files exist
+
+      const trimmed = text.trim().toLowerCase();
+      const words = trimmed.split(/\s+/);
+
+      // Vague phrases that don't specify WHAT to fix
+      const vaguePatterns = [
+        'its gone', 'it\'s gone', 'its missing', 'it\'s missing',
+        'not working', 'doesn\'t work', 'broken', 'not right',
+        'its still', 'it\'s still', 'still not', 'still',
+        'check the code', 'check it', 'look at', 'see',
+        'wrong', 'incorrect', 'bad', 'weird', 'strange'
+      ];
+
+      // If prompt is short (<15 chars) and matches vague pattern
+      if (trimmed.length < 15 && vaguePatterns.some(pattern => trimmed.includes(pattern))) {
+        return true;
+      }
+
+      // Very short prompts (1-3 words) without specific file/component names
+      if (words.length <= 3 && !trimmed.match(/\.(tsx?|jsx?|css|html)/)) {
+        const hasSpecifics = trimmed.match(/(function|class|component|button|form|page|file|line \d+)/);
+        if (!hasSpecifics && vaguePatterns.some(pattern => trimmed.includes(pattern))) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
     const isConversational = prompt && detectConversational(prompt);
+    const isVagueModification = prompt && detectVagueModification(prompt, projectFiles && projectFiles.length > 0);
 
     if (isConversational) {
+      logger.info('decision', `Detected conversational prompt: "${prompt}"`);
       console.log(`Detected conversational prompt: "${prompt}" - Providing helpful response instead of code generation`);
     }
 
-    if (isConversational && type === "generate-stream") {
-      console.log("Returning conversational response via SSE stream");
+    if (isVagueModification) {
+      logger.warn('decision', `Detected vague modification prompt: "${prompt}" - Asking for clarification`);
+      console.log(`Vague prompt detected: "${prompt}" - Requesting specific details`);
+    }
 
-      // Return a friendly response asking what they want to build
+    // CRITICAL: Block conversational and vague prompts for ALL generation types
+    if ((isConversational || isVagueModification) && (type === "generate-stream" || type === "generate-multifile")) {
+      console.log("Returning conversational/vague prompt response via SSE stream");
+
+      let thought = "";
+      let message = "";
+
+      if (isConversational) {
+        thought = "## User Greeted or Sent Short Message\n\nI detected a conversational message rather than a code request. I'm here to help you build React applications!\n\nTo get started, try describing what you want to build, for example:\n- \"Build a todo list app\"\n- \"Create a weather dashboard\"\n- \"Make a landing page for a coffee shop\"\n- \"Build a tic-tac-toe game\"\n\nI can create complete React applications with multiple files, routing, state management, and beautiful UI using Tailwind CSS.";
+        message = "Hi! I'm ready to help you build something. What would you like to create?";
+      } else if (isVagueModification) {
+        thought = `## Vague Modification Request Detected\n\nYou said: "${prompt}"\n\nThis prompt is too vague for me to safely modify your code. I need more specific details to avoid accidentally breaking or removing working features.\n\n**Why I need specifics:**\n- Your project has existing code that I don't want to accidentally delete\n- Vague prompts like "not working" or "still wrong" don't tell me what to preserve\n- I need to know exactly what behavior you want changed\n\n**Instead of vague prompts, try being specific:**\n- ❌ "its still 2d" → ✅ "The cube needs more depth, increase the perspective value"\n- ❌ "not working" → ✅ "The button click handler isn't firing, check the onClick"\n- ❌ "check the code" → ✅ "Review the SpinningCube component's transform values"\n- ❌ "wrong" → ✅ "The animation should rotate on the Y-axis, not X-axis"\n\n**What to include in your prompt:**\n1. Which file or component has the issue\n2. What specific behavior is wrong\n3. What you expected vs what's happening\n4. Any error messages from the browser console`;
+        message = `Your prompt "${prompt}" is too vague. Please tell me:\n\n1. **What specifically is wrong?** (e.g., "The cube doesn't look 3D")\n2. **Which file/component has the issue?** (e.g., "SpinningCube.tsx")\n3. **What should I change?** (e.g., "Increase the perspective value")\n\nThis helps me fix the exact issue without accidentally removing working code!`;
+      }
+
+      // Return a helpful response
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: "done",
-            thought: "## User Greeted or Sent Short Message\n\nI detected a conversational message rather than a code request. I'm here to help you build React applications!\n\nTo get started, try describing what you want to build, for example:\n- \"Build a todo list app\"\n- \"Create a weather dashboard\"\n- \"Make a landing page for a coffee shop\"\n- \"Build a tic-tac-toe game\"\n\nI can create complete React applications with multiple files, routing, state management, and beautiful UI using Tailwind CSS.",
-            message: "Hi! I'm ready to help you build something. What would you like to create?",
-            files: []
+            thought,
+            message,
+            files: [],
+            _logs: {
+              entries: logger.getAllLogs(),
+              summary: logger.getSummary()
+            }
           })}\n\n`));
           controller.close();
         }
