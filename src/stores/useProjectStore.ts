@@ -72,6 +72,15 @@ interface PendingChanges {
     operations: FileOperation[];
 }
 
+// AI Plan for approval
+export interface AIPlan {
+    summary: string;
+    filesToRead: string[];
+    filesToCreate: string[];
+    filesToModify: string[];
+    approach: string;
+}
+
 interface ProjectStore {
     // Project state
     project: Project | null;
@@ -91,6 +100,9 @@ interface ProjectStore {
 
     // Pending changes for confirmation
     pendingChanges: PendingChanges | null;
+    
+    // AI Plan state
+    currentPlan: AIPlan | null;
 
     // Project actions
     createProject: (name: string, templateFiles?: Omit<ProjectFile, 'id'>[]) => void;
@@ -123,6 +135,11 @@ interface ProjectStore {
     setPendingChanges: (changes: PendingChanges | null) => void;
     confirmPendingChanges: () => void;
     rejectPendingChanges: () => void;
+    
+    // Plan actions
+    setCurrentPlan: (plan: AIPlan | null) => void;
+    approvePlan: () => void;
+    rejectPlan: () => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -136,6 +153,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     isGenerating: false,
     sandpackError: null,
     pendingChanges: null,
+    currentPlan: null,
 
     // Project actions
     createProject: (name, templateFiles) => {
@@ -380,5 +398,19 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     rejectPendingChanges: () => {
         set({ pendingChanges: null });
+    },
+    
+    // Plan actions
+    setCurrentPlan: (plan) => {
+        set({ currentPlan: plan });
+    },
+    
+    approvePlan: () => {
+        // Plan approved - execution will be handled by the chat panel
+        // Just clear the plan state
+    },
+    
+    rejectPlan: () => {
+        set({ currentPlan: null });
     },
 }));
