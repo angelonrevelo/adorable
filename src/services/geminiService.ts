@@ -1,14 +1,17 @@
 import { supabase } from "@/integrations/supabase/client";
 import { GenerateVibeResponse, FileOperation } from "@/types";
-import { ProjectFile } from "@/types/projectTypes";
+import { ProjectFile, ConversationMessage } from "@/types/projectTypes";
 import { useConsoleStore } from "@/stores/useConsoleStore";
+import { selectRelevantFiles, buildEnrichedHistory } from "./fileSelectionService";
 
 // Get console store methods (can be called from non-React code)
 const getSysConsole = () => useConsoleStore.getState();
 
-interface HistoryMessage {
+// Extended history message with file operations
+export interface EnrichedHistoryMessage {
   role: 'user' | 'assistant';
   content: string;
+  filesModified?: string[];
 }
 
 // SSE Stream event types
@@ -24,18 +27,31 @@ export interface StreamEvent {
   error?: string;
 }
 
-// Streaming generator function for SSE
+// Streaming generator function for SSE with smart file selection
 export async function* generateVibeStream(
   prompt: string,
-  history: HistoryMessage[],
+  conversationHistory: ConversationMessage[],
   projectFiles?: ProjectFile[],
-  context?: string // New optional context parameter
+  context?: string
 ): AsyncGenerator<StreamEvent> {
-  // Format project files as context
-  const filesContext = projectFiles?.map(f => ({
+  const sysConsole = getSysConsole();
+  const startTime = Date.now();
+
+  // Smart file selection - only send relevant files
+  const relevantFiles = projectFiles 
+    ? selectRelevantFiles(projectFiles, prompt, conversationHistory, 15)
+    : [];
+
+  sysConsole.logSystem(`Smart selection: ${relevantFiles.length}/${projectFiles?.length || 0} files selected`);
+
+  // Format selected files for context
+  const filesContext = relevantFiles.map(f => ({
     path: f.path,
     content: f.content.length > 50000 ? f.content.slice(0, 50000) : f.content,
   }));
+
+  // Build enriched history with file operation info
+  const enrichedHistory = buildEnrichedHistory(conversationHistory);
 
   // Get the Supabase URL from env
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -46,19 +62,16 @@ export async function* generateVibeStream(
     yield { type: 'error', error: 'Supabase configuration missing' };
     return;
   }
-
-  const sysConsole = getSysConsole();
-  const startTime = Date.now();
   
   // Log files being sent
-  projectFiles?.forEach(f => {
+  relevantFiles.forEach(f => {
     sysConsole.logFileRead(f.path, f.content.length);
   });
 
   try {
     const bodyPayload = JSON.stringify({
       prompt: context ? `${prompt}\n\n=== CONTEXT / KNOWLEDGE ===\n${context}` : prompt,
-      history: history.map(m => ({ role: m.role, content: m.content })),
+      history: enrichedHistory,
       projectFiles: filesContext,
       type: 'generate-stream'
     });
@@ -147,22 +160,34 @@ export async function* generateVibeStream(
 
 export async function generateVibe(
   prompt: string,
-  history: HistoryMessage[],
+  conversationHistory: ConversationMessage[],
   projectFiles?: ProjectFile[],
-  context?: string // New optional context parameter
+  context?: string
 ): Promise<GenerateVibeResponse> {
-  // Format project files as context - only truncate extremely large files (>50KB)
-  const filesContext = projectFiles?.map(f => ({
+  const sysConsole = getSysConsole();
+
+  // Smart file selection - only send relevant files  
+  const relevantFiles = projectFiles 
+    ? selectRelevantFiles(projectFiles, prompt, conversationHistory, 15)
+    : [];
+
+  sysConsole.logSystem(`Smart selection: ${relevantFiles.length}/${projectFiles?.length || 0} files for non-streaming`);
+
+  // Format selected files for context
+  const filesContext = relevantFiles.map(f => ({
     path: f.path,
     content: f.content.length > 50000 ? f.content.slice(0, 50000) : f.content,
   }));
 
+  // Build enriched history
+  const enrichedHistory = buildEnrichedHistory(conversationHistory);
+
   const { data, error } = await supabase.functions.invoke('generate-vibe', {
     body: {
-      prompt: context ? `${prompt}\n\n=== CONTEXT / KNOWLEDGE ===\n${context}` : prompt, // Append context to prompt
-      history: history.map(m => ({ role: m.role, content: m.content })),
+      prompt: context ? `${prompt}\n\n=== CONTEXT / KNOWLEDGE ===\n${context}` : prompt,
+      history: enrichedHistory,
       projectFiles: filesContext,
-      type: 'generate-multifile' // New type for multi-file generation
+      type: 'generate-multifile'
     }
   });
 
