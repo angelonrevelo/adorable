@@ -1,25 +1,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-    Send,
     Dices,
     Sparkles,
     Loader2,
     Plus,
     FolderPlus,
     Paperclip,
-    Image as ImageIcon,
     X,
     ChevronDown,
     ChevronUp,
-    MessageSquare,
     ArrowUp,
-    Bug,
     AlertTriangle,
     Wrench,
-    Brain,
     BookOpen
 } from 'lucide-react';
-import { AIActivityPanel, ActivityItem } from './AIActivityPanel';
 import { useActivityStore } from '@/stores/useActivityStore';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
@@ -69,7 +63,6 @@ export function IDEChatPanel() {
         addEditing,
         addExplaining,
         addError,
-        activities,
         isActive,
     } = useActivityStore();
 
@@ -77,7 +70,6 @@ export function IDEChatPanel() {
     const [isLoadingIdea, setIsLoadingIdea] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [expandedThoughts, setExpandedThoughts] = useState<Set<string>>(new Set());
-    const [showActivity, setShowActivity] = useState(false);
     const [showKnowledge, setShowKnowledge] = useState(false);
     const [knowledgeInput, setKnowledgeInput] = useState('');
     const [autoRetryCount, setAutoRetryCount] = useState(0);
@@ -93,7 +85,7 @@ export function IDEChatPanel() {
 
     useEffect(() => {
         scrollToBottom();
-    }, [messages, activities]); // Added activities to dependency array
+    }, [messages]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -124,9 +116,8 @@ export function IDEChatPanel() {
 
         setGenerating(true);
 
-        // Start activity session and show panel
+        // Start activity session
         startSession();
-        setShowActivity(true);
 
         // Show reading activities for files being sent
         const projectFiles = Array.from(files.values());
@@ -489,85 +480,47 @@ export function IDEChatPanel() {
                             <div
                                 key={message.id}
                                 className={cn(
-                                    "group relative mb-4 flex items-start",
-                                    message.role === 'user' ? "flex-row-reverse" : "flex-row"
+                                    "mb-3",
+                                    message.role === 'user' ? "flex justify-end" : "flex justify-start"
                                 )}
                             >
                                 <div className={cn(
-                                    "flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md border text-xs shadow",
+                                    "max-w-[85%] rounded-xl px-3 py-2 text-sm",
                                     message.role === 'user'
-                                        ? "border-white/10 bg-[#2b2d31] text-white"
-                                        : "border-purple-500/20 bg-purple-500/10 text-purple-400"
-                                )}>
-                                    {message.role === 'user' ? (
-                                        <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500" />
-                                    ) : (
-                                        <Sparkles className="w-4 h-4" />
-                                    )}
-                                </div>
-
-                                <div className={cn(
-                                    "relative ml-2 mr-2 max-w-[calc(100%-3rem)] rounded-lg px-3 py-2 text-sm leading-normal shadow-md",
-                                    message.role === 'user'
-                                        ? "bg-[#2b2d31] text-white"
-                                        : "bg-[#1e1e24] text-gray-100 border border-white/5"
+                                        ? "bg-blue-600/20 text-blue-100 border border-blue-500/20"
+                                        : "bg-white/5 text-gray-200 border border-white/5"
                                 )}>
                                     <div className="whitespace-pre-wrap">{message.content}</div>
 
-                                    {/* Thought Block - Collapsible */}
+                                    {/* Thought Block - Compact */}
                                     {message.thought && (
-                                        <div className="mt-2 bg-[#13131a] border border-white/5 rounded-xl overflow-hidden">
-                                            <button
-                                                onClick={() => toggleThought(message.id)}
-                                                className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                                                    <span className="text-xs font-medium text-cyan-400 uppercase tracking-wider">
-                                                        Thinking
-                                                    </span>
-                                                </div>
-                                                {expandedThoughts.has(message.id) ? (
-                                                    <ChevronUp className="w-3.5 h-3.5 text-gray-500" />
-                                                ) : (
-                                                    <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
-                                                )}
-                                            </button>
-                                            {expandedThoughts.has(message.id) && (
-                                                <div className="px-3 pb-3">
-                                                    <p className="text-xs text-gray-400 whitespace-pre-wrap leading-relaxed">
-                                                        {message.thought}
-                                                    </p>
-                                                </div>
+                                        <button
+                                            onClick={() => toggleThought(message.id)}
+                                            className="mt-2 w-full flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                                        >
+                                            {expandedThoughts.has(message.id) ? (
+                                                <ChevronUp className="w-3 h-3" />
+                                            ) : (
+                                                <ChevronDown className="w-3 h-3" />
                                             )}
-                                        </div>
+                                            <span>Reasoning</span>
+                                        </button>
+                                    )}
+                                    {message.thought && expandedThoughts.has(message.id) && (
+                                        <p className="mt-2 text-xs text-gray-500 bg-black/20 p-2 rounded-lg whitespace-pre-wrap">
+                                            {message.thought}
+                                        </p>
                                     )}
                                 </div>
                             </div>
                         ))}
 
-                        {/* Inline Activity Bubble */}
-                        {(isActive || activities.length > 0) && (
-                            <div className="mb-4 pl-4 pr-12 animate-fade-in">
-                                <div className="bg-[#111118] border border-white/10 rounded-lg p-3">
-                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5 text-xs text-gray-500 font-medium uppercase tracking-wider">
-                                        {isActive ? (
-                                            <>
-                                                <Loader2 className="w-3 h-3 animate-spin text-purple-400" />
-                                                <span>AI Working...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Brain className="w-3 h-3 text-purple-400" />
-                                                <span>Activities</span>
-                                            </>
-                                        )}
-                                    </div>
-                                    <div className="space-y-1">
-                                        {activities.map((activity) => (
-                                            <ActivityItem key={activity.id} activity={activity} />
-                                        ))}
-                                    </div>
+                        {/* Inline Activity - Minimal */}
+                        {isActive && (
+                            <div className="mb-3 animate-fade-in">
+                                <div className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-xl text-xs text-purple-300">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    <span>Working...</span>
                                 </div>
                             </div>
                         )}
@@ -759,19 +712,6 @@ export function IDEChatPanel() {
                                     <Dices className="w-4 h-4" />
                                 )}
                             </button>
-                            {/* Activity panel toggle */}
-                            <button
-                                onClick={() => setShowActivity(!showActivity)}
-                                className={cn(
-                                    'p-2 rounded-lg transition-colors',
-                                    showActivity
-                                        ? 'bg-yellow-500/20 text-yellow-400'
-                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                )}
-                                title="Toggle AI Activity"
-                            >
-                                <Brain className="w-4 h-4" />
-                            </button>
                             {/* Knowledge toggle */}
                             <button
                                 onClick={() => setShowKnowledge(!showKnowledge)}
@@ -789,12 +729,6 @@ export function IDEChatPanel() {
 
                         {/* Right side actions */}
                         <div className="flex items-center gap-2">
-                            {/* Chat mode indicator */}
-                            <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-yellow-600/20 rounded-full">
-                                <MessageSquare className="w-3 h-3 text-yellow-400" />
-                                <span className="text-xs font-medium text-yellow-400">Chat</span>
-                            </div>
-
                             {/* Send button */}
                             <button
                                 onClick={handleSend}

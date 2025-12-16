@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type LogCategory = 'file' | 'api' | 'parse' | 'system' | 'ai';
+export type LogCategory = 'file' | 'api' | 'parse' | 'system' | 'ai' | 'plan';
 
 export interface ConsoleLog {
   id: string;
@@ -17,10 +17,16 @@ export interface ConsoleLog {
 interface ConsoleStore {
   logs: ConsoleLog[];
   maxLogs: number;
+  searchQuery: string;
   
   // Core actions
   addLog: (log: Omit<ConsoleLog, 'id' | 'timestamp'>) => void;
   clearLogs: () => void;
+  setSearchQuery: (query: string) => void;
+  
+  // Export methods
+  exportLogs: () => string;
+  copyLogs: () => void;
   
   // Convenience methods with icons
   logFileRead: (fileName: string, size?: number) => void;
@@ -33,11 +39,13 @@ interface ConsoleStore {
   logError: (message: string, error?: Error) => void;
   logSystem: (message: string) => void;
   logStreaming: (chars: number) => void;
+  logPlan: (message: string, data?: any) => void;
 }
 
 export const useConsoleStore = create<ConsoleStore>((set, get) => ({
   logs: [],
   maxLogs: 500,
+  searchQuery: '',
   
   addLog: (log) => {
     const newLog: ConsoleLog = {
@@ -53,6 +61,38 @@ export const useConsoleStore = create<ConsoleStore>((set, get) => ({
   
   clearLogs: () => {
     set({ logs: [] });
+  },
+  
+  setSearchQuery: (query) => {
+    set({ searchQuery: query });
+  },
+  
+  exportLogs: () => {
+    const { logs } = get();
+    const formatTime = (ts: number) => {
+      const d = new Date(ts);
+      return d.toLocaleTimeString('en-US', { hour12: false }) + '.' + d.getMilliseconds().toString().padStart(3, '0');
+    };
+    
+    let output = `# Adorable IDE System Logs\n`;
+    output += `# Exported: ${new Date().toISOString()}\n`;
+    output += `# Total: ${logs.length} entries\n\n`;
+    
+    logs.forEach(log => {
+      const time = formatTime(log.timestamp);
+      const duration = log.duration ? ` (${log.duration.toFixed(0)}ms)` : '';
+      output += `[${time}] [${log.level.toUpperCase()}] ${log.message}${duration}\n`;
+      if (log.data) {
+        output += `  └─ ${typeof log.data === 'string' ? log.data.slice(0, 200) : JSON.stringify(log.data).slice(0, 200)}\n`;
+      }
+    });
+    
+    return output;
+  },
+  
+  copyLogs: () => {
+    const text = get().exportLogs();
+    navigator.clipboard.writeText(text);
   },
   
   logFileRead: (fileName, size) => {
@@ -136,7 +176,6 @@ export const useConsoleStore = create<ConsoleStore>((set, get) => ({
   },
   
   logStreaming: (chars) => {
-    // Only log at certain intervals to avoid spam
     if (chars % 1000 === 0) {
       get().addLog({
         level: 'debug',
@@ -144,5 +183,14 @@ export const useConsoleStore = create<ConsoleStore>((set, get) => ({
         message: `📶 Streaming: ${chars} chars received`,
       });
     }
+  },
+  
+  logPlan: (message, data) => {
+    get().addLog({
+      level: 'info',
+      category: 'plan',
+      message: `📋 ${message}`,
+      data,
+    });
   },
 }));

@@ -1,6 +1,5 @@
 import { FileOperation } from '@/types/projectTypes';
-import { useProjectStore } from '@/stores/useProjectStore';
-import { Check, X, FileCode, FilePlus, FileX, ChevronDown, ChevronRight, Brain } from 'lucide-react';
+import { Check, X, FileCode, FilePlus, FileX, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -61,11 +60,11 @@ export function ConfirmChangesPanel({
       {/* Header */}
       <div className="px-4 py-3 border-b border-yellow-500/20 bg-yellow-500/10">
         <div className="flex items-center gap-2">
-          <Brain className="w-5 h-5 text-yellow-400" />
-          <h3 className="font-medium text-white">AI wants to make changes</h3>
+          <Sparkles className="w-4 h-4 text-yellow-400" />
+          <h3 className="text-sm font-medium text-white">Proposed Changes</h3>
         </div>
         {message && (
-          <p className="text-sm text-gray-300 mt-1">{message}</p>
+          <p className="text-xs text-gray-400 mt-1">{message}</p>
         )}
       </div>
       
