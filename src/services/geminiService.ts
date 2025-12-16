@@ -1,6 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { GenerateVibeResponse, FileOperation } from "@/types";
 import { ProjectFile } from "@/types/projectTypes";
+import { useConsoleStore } from "@/stores/useConsoleStore";
+
+// Get console store methods (can be called from non-React code)
+const getSysConsole = () => useConsoleStore.getState();
 
 interface HistoryMessage {
   role: 'user' | 'assistant';
@@ -43,23 +47,36 @@ export async function* generateVibeStream(
     return;
   }
 
+  const sysConsole = getSysConsole();
+  const startTime = Date.now();
+  
+  // Log files being sent
+  projectFiles?.forEach(f => {
+    sysConsole.logFileRead(f.path, f.content.length);
+  });
+
   try {
+    const bodyPayload = JSON.stringify({
+      prompt: context ? `${prompt}\n\n=== CONTEXT / KNOWLEDGE ===\n${context}` : prompt,
+      history: history.map(m => ({ role: m.role, content: m.content })),
+      projectFiles: filesContext,
+      type: 'generate-stream'
+    });
+    
+    sysConsole.logApiRequest('generate-vibe (stream)', bodyPayload.length);
+    
     const response = await fetch(`${supabaseUrl}/functions/v1/generate-vibe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${supabaseKey}`,
       },
-      body: JSON.stringify({
-        prompt: context ? `${prompt}\n\n=== CONTEXT / KNOWLEDGE ===\n${context}` : prompt, // Append context to prompt
-        history: history.map(m => ({ role: m.role, content: m.content })),
-        projectFiles: filesContext,
-        type: 'generate-stream'
-      }),
+      body: bodyPayload,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      sysConsole.logApiResponse(response.status, errorText, Date.now() - startTime);
       yield { type: 'error', error: errorText };
       return;
     }
@@ -87,9 +104,24 @@ export async function* generateVibeStream(
         if (line.startsWith('data: ')) {
           try {
             const event = JSON.parse(line.slice(6)) as StreamEvent;
+            
+            // Log streaming events
+            if (event.type === 'thinking') {
+              sysConsole.logSystem('AI started thinking...');
+            } else if (event.type === 'done') {
+              sysConsole.logApiResponse(200, 'Stream complete', Date.now() - startTime);
+              if (event.thought) {
+                sysConsole.logAIThought(event.thought);
+              }
+              if (event.files) {
+                sysConsole.logParsing('success', `${event.files.length} file operations`);
+                sysConsole.logAIResponse(event.message || 'Done', event.files.length);
+              }
+            }
+            
             yield event;
           } catch (e) {
-            console.error('Failed to parse SSE event:', line);
+            sysConsole.logError('Failed to parse SSE event', e instanceof Error ? e : undefined);
           }
         }
       }
@@ -101,10 +133,11 @@ export async function* generateVibeStream(
         const event = JSON.parse(buffer.slice(6)) as StreamEvent;
         yield event;
       } catch (e) {
-        console.error('Failed to parse final SSE event:', buffer);
+        sysConsole.logError('Failed to parse final SSE event', e instanceof Error ? e : undefined);
       }
     }
   } catch (error) {
+    sysConsole.logError('Network error during streaming', error instanceof Error ? error : undefined);
     yield {
       type: 'error',
       error: error instanceof Error ? error.message : 'Network error'

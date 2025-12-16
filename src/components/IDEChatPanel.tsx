@@ -23,9 +23,11 @@ import { AIActivityPanel, ActivityItem } from './AIActivityPanel';
 import { useActivityStore } from '@/stores/useActivityStore';
 import { cn } from '@/lib/utils';
 import { useProjectStore } from '@/stores/useProjectStore';
+import { useConsoleStore } from '@/stores/useConsoleStore';
 import { templates } from '@/templates/projectTemplates';
 import { generateVibe, generateVibeStream, generateRandomIdea } from '@/services/geminiService';
 import { ConversationMessage } from '@/types/projectTypes';
+import { ConfirmChangesPanel } from './ConfirmChangesPanel';
 
 interface Attachment {
     id: string;
@@ -50,7 +52,13 @@ export function IDEChatPanel() {
         createProject,
         sandpackError,
         clearSandpackError,
+        pendingChanges,
+        setPendingChanges,
+        confirmPendingChanges,
+        rejectPendingChanges,
     } = useProjectStore();
+
+    const { logSystem, logError, logFileWrite } = useConsoleStore();
 
     const {
         startSession,
@@ -107,6 +115,8 @@ export function IDEChatPanel() {
         setInput('');
         setAttachments([]);
 
+        logSystem(`User prompt: "${userInput.slice(0, 50)}${userInput.length > 50 ? '...' : ''}"`);
+
         addMessage({
             role: 'user',
             content: userInput,
@@ -120,6 +130,7 @@ export function IDEChatPanel() {
 
         // Show reading activities for files being sent
         const projectFiles = Array.from(files.values());
+        logSystem(`Sending ${projectFiles.length} project files to AI`);
         projectFiles.forEach(file => {
             addReading(file.path.split('/').pop() || file.path);
         });
@@ -197,8 +208,14 @@ export function IDEChatPanel() {
                             fileOperations: resultFiles,
                         });
 
+                        // Use confirmation flow instead of direct apply
                         if (resultFiles.length > 0) {
-                            applyFileOperations(resultFiles);
+                            logSystem(`AI proposes ${resultFiles.length} file changes - awaiting confirmation`);
+                            setPendingChanges({
+                                thought: thought,
+                                message: message,
+                                operations: resultFiles,
+                            });
                         }
                         break;
 
@@ -212,6 +229,7 @@ export function IDEChatPanel() {
             }
         } catch (error) {
             console.error('Error generating:', error);
+            logError('Generation failed', error instanceof Error ? error : undefined);
             if (thinkingId) {
                 stopThinking(thinkingId);
             }
@@ -224,7 +242,7 @@ export function IDEChatPanel() {
             setGenerating(false);
             endSession();
         }
-    }, [input, isGenerating, messages, files, addMessage, setGenerating, applyFileOperations, startSession, endSession, startThinking, stopThinking, addReading, addEditing, addExplaining, addError, attachments, knowledgeInput]);
+    }, [input, isGenerating, messages, files, addMessage, setGenerating, setPendingChanges, startSession, endSession, startThinking, stopThinking, addReading, addEditing, addExplaining, addError, attachments, knowledgeInput, logSystem, logError]);
 
     // Handle Fix error button click
     const handleFixError = useCallback(async () => {
@@ -600,6 +618,26 @@ export function IDEChatPanel() {
                                     </button>
                                 )}
                             </div>
+                        )}
+
+                        {/* Pending Changes Confirmation */}
+                        {pendingChanges && (
+                            <ConfirmChangesPanel
+                                thought={pendingChanges.thought}
+                                message={pendingChanges.message}
+                                operations={pendingChanges.operations}
+                                onConfirm={() => {
+                                    logSystem('User confirmed changes - applying file operations');
+                                    pendingChanges.operations.forEach(op => {
+                                        logFileWrite(op.path.split('/').pop() || op.path, op.action);
+                                    });
+                                    confirmPendingChanges();
+                                }}
+                                onReject={() => {
+                                    logSystem('User rejected changes');
+                                    rejectPendingChanges();
+                                }}
+                            />
                         )}
                         <div ref={messagesEndRef} />
                     </>
