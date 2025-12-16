@@ -1,4 +1,12 @@
 import { ProjectFile, FileOperation, ConversationMessage } from '@/types/projectTypes';
+import { estimateTokens, TOKEN_LIMITS, formatTokenCount } from '@/utils/tokenCounter';
+
+export interface FileSelectionResult {
+  files: ProjectFile[];
+  totalTokens: number;
+  filesOmitted: number;
+  tokenLimitReached: boolean;
+}
 
 /**
  * Intelligently select relevant files based on:
@@ -6,12 +14,14 @@ import { ProjectFile, FileOperation, ConversationMessage } from '@/types/project
  * 2. Files recently modified by AI
  * 3. Files mentioned in the prompt
  * 4. Files imported by recently modified files
+ * 5. Token budget management
  */
 export function selectRelevantFiles(
   allFiles: ProjectFile[],
   prompt: string,
   conversationHistory: ConversationMessage[],
-  maxFiles: number = 15
+  maxFiles: number = 15,
+  maxTokens: number = TOKEN_LIMITS['safe-limit']
 ): ProjectFile[] {
   const relevantPaths = new Set<string>();
   const fileScores = new Map<string, number>();
@@ -84,15 +94,61 @@ export function selectRelevantFiles(
     }
   });
 
-  // Sort by score and take top N files
-  const sortedPaths = Array.from(fileScores.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, maxFiles)
-    .map(([path]) => path);
+  // Sort by score and filter by token budget
+  const sortedEntries = Array.from(fileScores.entries())
+    .sort((a, b) => b[1] - a[1]);
+
+  // Select files respecting both file count and token limits
+  const selectedPaths: string[] = [];
+  let totalTokens = 0;
+
+  for (const [path, score] of sortedEntries) {
+    if (selectedPaths.length >= maxFiles) break;
+
+    const file = allFiles.find(f => f.path === path);
+    if (!file) continue;
+
+    const fileTokens = estimateTokens(file.content);
+
+    // Always include high-priority files (score >= 90), otherwise check token limit
+    if (score >= 90 || (totalTokens + fileTokens) <= maxTokens) {
+      selectedPaths.push(path);
+      totalTokens += fileTokens;
+    } else if (selectedPaths.length < 3) {
+      // Always include at least 3 files even if over token limit
+      selectedPaths.push(path);
+      totalTokens += fileTokens;
+    }
+  }
+
+  console.log(`[FileSelection] Selected ${selectedPaths.length} files, ${formatTokenCount(totalTokens)}`);
 
   // Return files in order of relevance
-  return allFiles.filter(f => sortedPaths.includes(f.path))
+  return allFiles.filter(f => selectedPaths.includes(f.path))
     .sort((a, b) => (fileScores.get(b.path) || 0) - (fileScores.get(a.path) || 0));
+}
+
+/**
+ * Enhanced file selection with detailed token tracking
+ */
+export function selectRelevantFilesWithStats(
+  allFiles: ProjectFile[],
+  prompt: string,
+  conversationHistory: ConversationMessage[],
+  maxFiles: number = 15,
+  maxTokens: number = TOKEN_LIMITS['safe-limit']
+): FileSelectionResult {
+  const files = selectRelevantFiles(allFiles, prompt, conversationHistory, maxFiles, maxTokens);
+  const totalTokens = files.reduce((sum, file) => sum + estimateTokens(file.content), 0);
+  const filesOmitted = Math.max(0, allFiles.length - files.length);
+  const tokenLimitReached = totalTokens >= maxTokens * 0.9; // 90% threshold
+
+  return {
+    files,
+    totalTokens,
+    filesOmitted,
+    tokenLimitReached,
+  };
 }
 
 /**

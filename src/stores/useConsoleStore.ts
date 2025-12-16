@@ -40,6 +40,13 @@ interface ConsoleStore {
   logSystem: (message: string) => void;
   logStreaming: (chars: number) => void;
   logPlan: (message: string, data?: any) => void;
+
+  // Enhanced logging methods (v2.1.0)
+  logTokenUsage: (promptTokens: number, responseTokens: number, totalTokens: number) => void;
+  logTokenBudget: (remaining: number, percentage: number, level: 'ok' | 'warning' | 'danger') => void;
+  logCodeMetrics: (metrics: {filesCreated: number, filesModified: number, linesAdded: number}) => void;
+  logValidation: (errors: number, warnings: number) => void;
+  logPerformance: (operation: string, duration: number, tokensPerSecond?: number) => void;
 }
 
 export const useConsoleStore = create<ConsoleStore>((set, get) => ({
@@ -191,6 +198,77 @@ export const useConsoleStore = create<ConsoleStore>((set, get) => ({
       category: 'plan',
       message: `📋 ${message}`,
       data,
+    });
+  },
+
+  // Enhanced logging methods (v2.1.0)
+  logTokenUsage: (promptTokens, responseTokens, totalTokens) => {
+    const formatNum = (n: number) => n.toLocaleString();
+    get().addLog({
+      level: 'info',
+      category: 'ai',
+      message: `🔢 Tokens: ${formatNum(promptTokens)} prompt + ${formatNum(responseTokens)} response = ${formatNum(totalTokens)} total`,
+      data: { promptTokens, responseTokens, totalTokens },
+    });
+  },
+
+  logTokenBudget: (remaining, percentage, level) => {
+    const icon = level === 'danger' ? '🚨' : level === 'warning' ? '⚠️' : '✅';
+    const formatNum = (n: number) => n.toLocaleString();
+    get().addLog({
+      level: level === 'danger' ? 'error' : level === 'warning' ? 'warn' : 'info',
+      category: 'system',
+      message: `${icon} Token budget: ${formatNum(remaining)} remaining (${percentage.toFixed(1)}%)`,
+      data: { remaining, percentage, level },
+    });
+  },
+
+  logCodeMetrics: (metrics) => {
+    const { filesCreated, filesModified, linesAdded } = metrics;
+    const parts: string[] = [];
+    if (filesCreated > 0) parts.push(`+${filesCreated} files`);
+    if (filesModified > 0) parts.push(`~${filesModified} files`);
+    if (linesAdded > 0) parts.push(`+${linesAdded} lines`);
+
+    get().addLog({
+      level: 'info',
+      category: 'system',
+      message: `📝 Code: ${parts.join(', ') || 'No changes'}`,
+      data: metrics,
+    });
+  },
+
+  logValidation: (errors, warnings) => {
+    const icon = errors > 0 ? '❌' : warnings > 0 ? '⚠️' : '✅';
+    const level: LogLevel = errors > 0 ? 'error' : warnings > 0 ? 'warn' : 'info';
+
+    get().addLog({
+      level,
+      category: 'system',
+      message: `${icon} Validation: ${errors} error${errors !== 1 ? 's' : ''}, ${warnings} warning${warnings !== 1 ? 's' : ''}`,
+      data: { errors, warnings },
+    });
+  },
+
+  logPerformance: (operation, duration, tokensPerSecond) => {
+    const seconds = (duration / 1000).toFixed(1);
+    const isSlow = duration > 20000;
+    const icon = isSlow ? '🐌' : '⚡';
+
+    let message = `${icon} ${operation}: ${seconds}s`;
+    if (tokensPerSecond) {
+      message += ` (${Math.round(tokensPerSecond)} tok/s)`;
+    }
+    if (isSlow) {
+      message += ' [SLOW]';
+    }
+
+    get().addLog({
+      level: isSlow ? 'warn' : 'info',
+      category: 'system',
+      message,
+      duration,
+      data: { operation, duration, tokensPerSecond },
     });
   },
 }));

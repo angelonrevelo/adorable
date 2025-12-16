@@ -8,6 +8,14 @@ const corsHeaders = {
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
+// Prompt template versioning for A/B testing and tracking improvements
+const PROMPT_VERSION = "2.1.0"; // Updated with edge cases, accessibility, and error handling
+const PROMPT_CHANGELOG = {
+  "2.1.0": "Added edge cases, accessibility, performance, and error handling rules",
+  "2.0.0": "Multi-file system with SCoT, few-shot examples",
+  "1.0.0": "Legacy single-file HTML generation",
+};
+
 // Legacy single-file HTML prompt (for backward compatibility)
 const legacySystemPrompt = `You are an elite Creative Technologist who builds stunning, production-quality web prototypes. Every output must look like it was crafted by a top-tier design agency.
 
@@ -104,7 +112,22 @@ You MUST respond with this exact JSON structure:
 6. Self-close tags: <img />, <input />, <br />
 7. Use className not class
 8. Make UI look PREMIUM with gradients, shadows, transitions
-9. Export default the main component`;
+9. Export default the main component
+10. **EDGE CASES**: Handle empty states, loading states, and error states gracefully
+11. **ACCESSIBILITY**: Use semantic HTML (header, nav, main, section, article, footer)
+    - Add aria-label to icon buttons
+    - Use proper heading hierarchy (h1 -> h2 -> h3)
+    - Ensure sufficient color contrast (WCAG AA minimum)
+12. **PERFORMANCE**: Avoid unnecessary re-renders
+    - Use React.memo for expensive components
+    - Memoize callbacks with useCallback when passed to children
+    - Memoize computed values with useMemo
+13. **ERROR HANDLING**: Wrap async operations in try-catch
+    - Show user-friendly error messages
+    - Provide retry mechanisms for failed operations
+    - Log errors for debugging
+
+## PROMPT VERSION: ${PROMPT_VERSION}`;
 
 
 
@@ -1553,6 +1576,399 @@ function App() {
         <h1 className="text-2xl font-bold text-white mb-6">Animated Cards</h1>
         <AnimatedCardList />
       </div>
+    </div>
+  );
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
+        },
+        // Example 8: Error Handling with Retry Logic
+        {
+          role: "user",
+          parts: [{ text: "Create a weather app that fetches from an API with error handling" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- WeatherApp with fetch logic and error handling\n\n## 2. STATE\n- weather: WeatherData | null\n- loading: boolean\n- error: string | null\n- retryCount: number\n\n## 3. FUNCTIONS\n- fetchWeather with try-catch\n- handleRetry\n\n## 4. STYLING\n- Weather card with icons, error state, loading spinner\n\n## 5. FILE PLAN\n- CREATE src/components/WeatherApp.tsx\n- MODIFY src/App.tsx",
+              message: "Created WeatherApp with comprehensive error handling and retry logic",
+              files: [
+                {
+                  path: "src/components/WeatherApp.tsx",
+                  content: `import { useState, useEffect } from 'react';
+import { Cloud, AlertCircle, RefreshCw, MapPin } from 'lucide-react';
+
+interface WeatherData {
+  temperature: number;
+  condition: string;
+  location: string;
+  humidity: number;
+}
+
+export function WeatherApp() {
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState<number>(0);
+
+  const fetchWeather = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Using Open-Meteo API (no key required)
+      const response = await fetch(
+        'https://api.open-meteo.com/v1/forecast?latitude=40.7128&longitude=-74.0060&current=temperature_2m,relative_humidity_2m'
+      );
+
+      if (!response.ok) {
+        throw new Error(\`HTTP error! status: \${response.status}\`);
+      }
+
+      const data = await response.json();
+
+      setWeather({
+        temperature: Math.round(data.current.temperature_2m),
+        condition: 'Partly Cloudy',
+        location: 'New York, NY',
+        humidity: data.current.relative_humidity_2m,
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch weather data';
+      setError(errorMessage);
+      console.error('Weather fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
+    fetchWeather();
+  };
+
+  useEffect(() => {
+    fetchWeather();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10 flex items-center justify-center min-h-[300px]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-300">Loading weather data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-500/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-red-500/20">
+        <div className="flex items-start gap-4 mb-6">
+          <AlertCircle className="w-8 h-8 text-red-400 flex-shrink-0 mt-1" />
+          <div>
+            <h3 className="text-xl font-bold text-white mb-2">Unable to Load Weather</h3>
+            <p className="text-red-300 text-sm mb-1">{error}</p>
+            {retryCount > 0 && (
+              <p className="text-slate-400 text-xs">Retry attempt: {retryCount}</p>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={handleRetry}
+          className="w-full px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 text-white rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+        >
+          <RefreshCw className="w-5 h-5" />
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!weather) {
+    return (
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10">
+        <p className="text-slate-300 text-center">No weather data available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10">
+      <div className="flex items-center gap-3 mb-6">
+        <MapPin className="w-6 h-6 text-violet-400" />
+        <h2 className="text-2xl font-bold text-white">{weather.location}</h2>
+      </div>
+
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <div className="text-6xl font-bold text-white mb-2">{weather.temperature}°C</div>
+          <p className="text-slate-300 text-lg">{weather.condition}</p>
+        </div>
+        <Cloud className="w-24 h-24 text-violet-400" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 pt-6 border-t border-white/10">
+        <div className="bg-white/5 rounded-xl p-4">
+          <p className="text-slate-400 text-sm mb-1">Humidity</p>
+          <p className="text-white text-2xl font-semibold">{weather.humidity}%</p>
+        </div>
+        <div className="bg-white/5 rounded-xl p-4">
+          <p className="text-slate-400 text-sm mb-1">Last Updated</p>
+          <p className="text-white text-sm">Just now</p>
+        </div>
+      </div>
+
+      <button
+        onClick={fetchWeather}
+        className="w-full mt-6 px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+        aria-label="Refresh weather data"
+      >
+        <RefreshCw className="w-4 h-4" />
+        Refresh
+      </button>
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { WeatherApp } from './components/WeatherApp';
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <WeatherApp />
+      </div>
+    </div>
+  );
+}
+
+export default App;`,
+                  action: "modify"
+                }
+              ]
+            })
+          }]
+        },
+        // Example 9: Zustand Global State Management
+        {
+          role: "user",
+          parts: [{ text: "Create a todo app with global state using zustand" }]
+        },
+        {
+          role: "model",
+          parts: [{
+            text: JSON.stringify({
+              thought: "## 1. COMPONENTS\n- TodoList component\n- TodoItem component\n- AddTodoForm component\n\n## 2. STATE (Zustand)\n- todos: Todo[] in store\n- addTodo, toggleTodo, deleteTodo actions\n\n## 3. FUNCTIONS\n- Store actions for state mutations\n- Form submission handler\n\n## 4. STYLING\n- Card layout, checkboxes, delete buttons\n\n## 5. FILE PLAN\n- CREATE src/stores/useTodoStore.ts\n- CREATE src/components/TodoList.tsx\n- CREATE src/components/TodoItem.tsx\n- CREATE src/components/AddTodoForm.tsx\n- MODIFY src/App.tsx",
+              message: "Created todo app with Zustand for global state management",
+              files: [
+                {
+                  path: "src/stores/useTodoStore.ts",
+                  content: `import { create } from 'zustand';
+
+export interface Todo {
+  id: string;
+  text: string;
+  completed: boolean;
+  createdAt: number;
+}
+
+interface TodoStore {
+  todos: Todo[];
+  addTodo: (text: string) => void;
+  toggleTodo: (id: string) => void;
+  deleteTodo: (id: string) => void;
+  clearCompleted: () => void;
+}
+
+export const useTodoStore = create<TodoStore>((set) => ({
+  todos: [],
+
+  addTodo: (text: string) => set((state) => ({
+    todos: [
+      ...state.todos,
+      {
+        id: crypto.randomUUID(),
+        text,
+        completed: false,
+        createdAt: Date.now(),
+      },
+    ],
+  })),
+
+  toggleTodo: (id: string) => set((state) => ({
+    todos: state.todos.map((todo) =>
+      todo.id === id ? { ...todo, completed: !todo.completed } : todo
+    ),
+  })),
+
+  deleteTodo: (id: string) => set((state) => ({
+    todos: state.todos.filter((todo) => todo.id !== id),
+  })),
+
+  clearCompleted: () => set((state) => ({
+    todos: state.todos.filter((todo) => !todo.completed),
+  })),
+}));`,
+                  action: "create"
+                },
+                {
+                  path: "src/components/TodoItem.tsx",
+                  content: `import { Trash2 } from 'lucide-react';
+import { Todo } from '../stores/useTodoStore';
+
+interface TodoItemProps {
+  todo: Todo;
+  onToggle: () => void;
+  onDelete: () => void;
+}
+
+export function TodoItem({ todo, onToggle, onDelete }: TodoItemProps) {
+  return (
+    <div className="bg-white/5 rounded-xl p-4 border border-white/10 flex items-center gap-4 group hover:bg-white/10 transition-colors">
+      <input
+        type="checkbox"
+        checked={todo.completed}
+        onChange={onToggle}
+        className="w-5 h-5 rounded border-2 border-violet-500 bg-transparent checked:bg-violet-500 cursor-pointer"
+        aria-label={\`Mark "\${todo.text}" as \${todo.completed ? 'incomplete' : 'complete'}\`}
+      />
+      <span className={\`flex-1 text-white \${todo.completed ? 'line-through text-slate-500' : ''}\`}>
+        {todo.text}
+      </span>
+      <button
+        onClick={onDelete}
+        className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+        aria-label={\`Delete "\${todo.text}"\`}
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/components/AddTodoForm.tsx",
+                  content: `import { useState } from 'react';
+import { Plus } from 'lucide-react';
+
+interface AddTodoFormProps {
+  onAdd: (text: string) => void;
+}
+
+export function AddTodoForm({ onAdd }: AddTodoFormProps) {
+  const [text, setText] = useState<string>('');
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (text.trim()) {
+      onAdd(text.trim());
+      setText('');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-2">
+      <input
+        type="text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Add a new todo..."
+        className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+        aria-label="New todo text"
+      />
+      <button
+        type="submit"
+        disabled={!text.trim()}
+        className="px-6 py-3 bg-gradient-to-r from-violet-500 to-purple-500 hover:from-violet-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all shadow-lg flex items-center gap-2"
+        aria-label="Add todo"
+      >
+        <Plus className="w-5 h-5" />
+        Add
+      </button>
+    </form>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/components/TodoList.tsx",
+                  content: `import { useTodoStore } from '../stores/useTodoStore';
+import { TodoItem } from './TodoItem';
+import { AddTodoForm } from './AddTodoForm';
+import { CheckCircle2 } from 'lucide-react';
+
+export function TodoList() {
+  const { todos, addTodo, toggleTodo, deleteTodo, clearCompleted } = useTodoStore();
+
+  const completedCount = todos.filter(t => t.completed).length;
+  const activeCount = todos.length - completedCount;
+
+  return (
+    <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-white/10 w-full max-w-2xl">
+      <h1 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
+        <CheckCircle2 className="w-8 h-8 text-violet-400" />
+        My Todos
+      </h1>
+
+      <AddTodoForm onAdd={addTodo} />
+
+      {todos.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-slate-400">No todos yet. Add one to get started!</p>
+        </div>
+      ) : (
+        <>
+          <div className="space-y-2 mt-6" role="list">
+            {todos.map((todo) => (
+              <TodoItem
+                key={todo.id}
+                todo={todo}
+                onToggle={() => toggleTodo(todo.id)}
+                onDelete={() => deleteTodo(todo.id)}
+              />
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between mt-6 pt-6 border-t border-white/10">
+            <div className="text-slate-400 text-sm">
+              {activeCount} active · {completedCount} completed
+            </div>
+            {completedCount > 0 && (
+              <button
+                onClick={clearCompleted}
+                className="text-sm text-slate-400 hover:text-red-400 transition-colors"
+              >
+                Clear completed
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}`,
+                  action: "create"
+                },
+                {
+                  path: "src/App.tsx",
+                  content: `import { TodoList } from './components/TodoList';
+
+function App() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <TodoList />
     </div>
   );
 }

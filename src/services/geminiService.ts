@@ -3,6 +3,8 @@ import { GenerateVibeResponse, FileOperation } from "@/types";
 import { ProjectFile, ConversationMessage } from "@/types/projectTypes";
 import { useConsoleStore } from "@/stores/useConsoleStore";
 import { selectRelevantFiles, buildEnrichedHistory } from "./fileSelectionService";
+import { estimateTokens, getRemainingTokens, getTokenUsagePercentage, isTokenWarningZone, isTokenDangerZone, TOKEN_LIMITS } from "@/utils/tokenCounter";
+import { validatePrompt } from "@/utils/promptValidation";
 
 // Get console store methods (can be called from non-React code)
 const getSysConsole = () => useConsoleStore.getState();
@@ -37,6 +39,18 @@ export async function* generateVibeStream(
   const sysConsole = getSysConsole();
   const startTime = Date.now();
 
+  // Validate prompt before processing
+  const promptTokens = estimateTokens(prompt);
+  const contextTokens = estimateTokens(JSON.stringify(projectFiles || []));
+  const validation = validatePrompt(prompt, contextTokens);
+
+  sysConsole.logValidation(validation.errors.length, validation.warnings.length);
+
+  if (!validation.isValid) {
+    yield { type: 'error', error: validation.errors.join(', ') };
+    return;
+  }
+
   // Smart file selection - only send relevant files
   const relevantFiles = projectFiles
     ? selectRelevantFiles(projectFiles, prompt, conversationHistory, 15)
@@ -52,6 +66,26 @@ export async function* generateVibeStream(
 
   // Build enriched history with file operation info
   const enrichedHistory = buildEnrichedHistory(conversationHistory);
+
+  // Calculate total tokens for budget tracking
+  const historyTokens = estimateTokens(JSON.stringify(enrichedHistory));
+  const filesTokens = estimateTokens(JSON.stringify(filesContext));
+  const totalInputTokens = promptTokens + historyTokens + filesTokens;
+
+  // Log token usage
+  sysConsole.logTokenUsage(promptTokens, 0, totalInputTokens);
+
+  // Check token budget
+  const remaining = getRemainingTokens(totalInputTokens);
+  const percentage = getTokenUsagePercentage(totalInputTokens);
+
+  if (isTokenDangerZone(totalInputTokens)) {
+    sysConsole.logTokenBudget(remaining, percentage, 'danger');
+  } else if (isTokenWarningZone(totalInputTokens)) {
+    sysConsole.logTokenBudget(remaining, percentage, 'warning');
+  } else {
+    sysConsole.logTokenBudget(remaining, percentage, 'ok');
+  }
 
   // Get the Supabase URL from env
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -122,13 +156,37 @@ export async function* generateVibeStream(
             if (event.type === 'thinking') {
               sysConsole.logSystem('AI started thinking...');
             } else if (event.type === 'done') {
-              sysConsole.logApiResponse(200, 'Stream complete', Date.now() - startTime);
+              const duration = Date.now() - startTime;
+              sysConsole.logApiResponse(200, 'Stream complete', duration);
+
               if (event.thought) {
                 sysConsole.logAIThought(event.thought);
               }
+
               if (event.files) {
                 sysConsole.logParsing('success', `${event.files.length} file operations`);
                 sysConsole.logAIResponse(event.message || 'Done', event.files.length);
+
+                // Log code metrics
+                const filesCreated = event.files.filter(f => f.action === 'create').length;
+                const filesModified = event.files.filter(f => f.action === 'modify').length;
+                const linesAdded = event.files.reduce((sum, f) => {
+                  return sum + (f.content?.split('\n').length || 0);
+                }, 0);
+
+                sysConsole.logCodeMetrics({ filesCreated, filesModified, linesAdded });
+
+                // Estimate response tokens from generated content
+                const responseContent = event.files.map(f => f.content || '').join('\n');
+                const responseTokens = estimateTokens(responseContent + (event.thought || ''));
+                const totalTokens = totalInputTokens + responseTokens;
+
+                // Log complete token usage
+                sysConsole.logTokenUsage(promptTokens, responseTokens, totalTokens);
+
+                // Calculate tokens per second for performance
+                const tokensPerSecond = responseTokens / (duration / 1000);
+                sysConsole.logPerformance('Code generation', duration, tokensPerSecond);
               }
             }
 
