@@ -60,8 +60,9 @@ This guide provides all the context an AI assistant needs to work on this projec
 ### Backend
 - **Supabase Edge Functions** - Serverless functions (Deno runtime)
 - **Google Gemini API** - AI code generation
-  - `gemini-2.0-flash-001` - Fast model for simple tasks
-  - `gemini-2.0-flash-thinking-exp-01-21` - Advanced model for complex tasks
+  - `gemini-2.0-flash-exp` - Fast model (primary)
+  - `gemini-1.5-flash` - Stable fallback
+  - `gemini-1.5-pro` - High-quality fallback
 
 ### Development
 - **pnpm** - Package manager
@@ -796,8 +797,12 @@ git push origin main
 **Last Updated**: 2025-12-16 by Claude Sonnet 4.5
 
 **Current Status**:
-- ✅ All AI improvements deployed (v56)
+- ✅ All AI improvements deployed (v60+)
 - ✅ Self-correction loop active
 - ✅ Console awareness working
 - ✅ Smart model selection enabled
-- ✅ Extended thinking prompts live
+- ✅ Extended thinking prompts live (8 phases including error diagnosis)
+- ✅ Autonomous AI capabilities (proactive problem-solving)
+- ✅ Model fallback system (3-tier: primary → fallback1 → fallback2)
+- ✅ Conversational prompt detection
+- ✅ Fixed 404 model errors (gemini-2.0-flash-exp)
