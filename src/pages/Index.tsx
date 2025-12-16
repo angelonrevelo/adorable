@@ -22,10 +22,12 @@ const Index = () => {
     setIsGenerating(true);
 
     try {
-      // Build history for context
+      // Build history for context - convert to ConversationMessage format
       const history = messages.map((m) => ({
+        id: m.id,
         role: m.role,
         content: m.content,
+        timestamp: m.timestamp,
       }));
 
       const result = await generateVibe(content, history);

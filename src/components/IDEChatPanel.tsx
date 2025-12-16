@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
     Dices,
     Sparkles,
@@ -12,7 +12,9 @@ import {
     ArrowUp,
     AlertTriangle,
     Wrench,
-    BookOpen
+    BookOpen,
+    FileText,
+    Eye
 } from 'lucide-react';
 import { useActivityStore } from '@/stores/useActivityStore';
 import { cn } from '@/lib/utils';
@@ -20,6 +22,7 @@ import { useProjectStore } from '@/stores/useProjectStore';
 import { useConsoleStore } from '@/stores/useConsoleStore';
 import { templates } from '@/templates/projectTemplates';
 import { generateVibe, generateVibeStream, generateRandomIdea } from '@/services/geminiService';
+import { selectRelevantFiles, getRecentlyModifiedPaths } from '@/services/fileSelectionService';
 import { ConversationMessage } from '@/types/projectTypes';
 import { ConfirmChangesPanel } from './ConfirmChangesPanel';
 
@@ -75,6 +78,7 @@ export function IDEChatPanel() {
     const [autoRetryCount, setAutoRetryCount] = useState(0);
     const [lastErrorHash, setLastErrorHash] = useState<string | null>(null);
     const [retryCooldownUntil, setRetryCooldownUntil] = useState<number>(0);
+    const [showContextInfo, setShowContextInfo] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +100,19 @@ export function IDEChatPanel() {
         }
     }, [input]);
 
-    
+    // Compute context info for the indicator
+    const contextInfo = useMemo(() => {
+        const allFiles = Array.from(files.values());
+        const relevantFiles = selectRelevantFiles(allFiles, input || '', messages, 15);
+        const recentlyModified = getRecentlyModifiedPaths(messages);
+        return {
+            totalFiles: allFiles.length,
+            selectedFiles: relevantFiles.length,
+            recentlyModified,
+            fileNames: relevantFiles.map(f => f.path.split('/').pop() || f.path)
+        };
+    }, [files, input, messages]);
+
 
     const handleSend = useCallback(async (e?: React.FormEvent) => {
         e?.preventDefault(); // Prevent default form submission if called from form
@@ -126,11 +142,8 @@ export function IDEChatPanel() {
             addReading(file.path.split('/').pop() || file.path);
         });
 
-        // Prepare history
-        const history = messages.map((m: ConversationMessage) => ({
-            role: m.role,
-            content: m.content,
-        }));
+        // Pass full conversation history (with file operations for context)
+        const history = messages;
 
         let thinkingId: string | null = null;
         let thought = '';
@@ -251,10 +264,8 @@ export function IDEChatPanel() {
         setGenerating(true);
 
         try {
-            const history = messages.map((m: ConversationMessage) => ({
-                role: m.role,
-                content: m.content,
-            }));
+            // Pass full conversation history
+            const history = messages;
 
             const projectFiles = Array.from(files.values());
             const result = await generateVibe(fixPrompt, history, projectFiles);
@@ -645,6 +656,47 @@ export function IDEChatPanel() {
                                 )}
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* Context Indicator */}
+                <div className="flex items-center justify-between mb-2 px-1">
+                    <button
+                        onClick={() => setShowContextInfo(!showContextInfo)}
+                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                    >
+                        <Eye className="w-3 h-3" />
+                        <span>AI sees {contextInfo.selectedFiles}/{contextInfo.totalFiles} files</span>
+                        {contextInfo.recentlyModified.length > 0 && (
+                            <span className="text-yellow-400/70">
+                                • {contextInfo.recentlyModified.length} recently modified
+                            </span>
+                        )}
+                    </button>
+                </div>
+
+                {/* Context Details Dropdown */}
+                {showContextInfo && (
+                    <div className="mb-2 p-2 bg-[#1a1a24] rounded-lg border border-white/10 text-xs animate-fade-in">
+                        <div className="text-gray-400 mb-1">Files in context:</div>
+                        <div className="flex flex-wrap gap-1">
+                            {contextInfo.fileNames.slice(0, 10).map((name, i) => (
+                                <span 
+                                    key={i} 
+                                    className={cn(
+                                        "px-1.5 py-0.5 rounded text-xs",
+                                        contextInfo.recentlyModified.some(p => p.endsWith(name))
+                                            ? "bg-yellow-500/20 text-yellow-300"
+                                            : "bg-white/5 text-gray-400"
+                                    )}
+                                >
+                                    {name}
+                                </span>
+                            ))}
+                            {contextInfo.fileNames.length > 10 && (
+                                <span className="text-gray-500">+{contextInfo.fileNames.length - 10} more</span>
+                            )}
+                        </div>
                     </div>
                 )}
 

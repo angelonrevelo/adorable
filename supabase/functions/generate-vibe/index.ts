@@ -131,19 +131,27 @@ serve(async (req) => {
     if (type === "generate-stream") {
       console.log("Starting SSE streaming response");
 
-      // Build conversation history
+      // Build conversation history with file operation context
       const conversationHistory =
-        history?.map((msg: { role: string; content: string }) => ({
-          role: msg.role === "assistant" ? "model" : "user",
-          parts: [{ text: msg.content }],
-        })) || [];
+        history?.map((msg: { role: string; content: string; filesModified?: string[] }) => {
+          let content = msg.content;
+          // Include file operation context if available
+          if (msg.filesModified && msg.filesModified.length > 0) {
+            content += `\n[Files in this turn: ${msg.filesModified.join(', ')}]`;
+          }
+          return {
+            role: msg.role === "assistant" ? "model" : "user",
+            parts: [{ text: content }],
+          };
+        }) || [];
 
-      // Build context with files
+      // Build context with files - enhanced format
       let contextMessage = `
 === CRITICAL RULES ===
 1. MODIFY, DON'T REPLACE existing code
 2. PRESERVE existing design and structure
 3. ADD new features without removing existing ones
+4. You have ACCESS to conversation history showing what files were previously created/modified
 
 === TECH STACK ===
 React 18 + TypeScript + Tailwind CSS
@@ -151,10 +159,11 @@ React 18 + TypeScript + Tailwind CSS
 === OUTPUT FORMAT ===
 Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "...", "content": "...", "action": "create|modify|delete"}]}
 
-=== CURRENT CODE ===
+=== CURRENT CODE (Smart Selection - Most Relevant Files) ===
 `;
 
       if (projectFiles && projectFiles.length > 0) {
+        console.log(`Processing ${projectFiles.length} files for context`);
         for (const file of projectFiles) {
           contextMessage += `\n--- ${file.path} ---\n${file.content}\n`;
         }
@@ -347,10 +356,17 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
     } else if (type === "generate-multifile") {
       // Multi-file React generation with environment context
       const conversationHistory =
-        history?.map((msg: { role: string; content: string }) => ({
-          role: msg.role === "assistant" ? "model" : "user",
-          parts: [{ text: msg.content }],
-        })) || [];
+        history?.map((msg: { role: string; content: string; filesModified?: string[] }) => {
+          let content = msg.content;
+          // Include file operation context if available
+          if (msg.filesModified && msg.filesModified.length > 0) {
+            content += `\n[Files in this turn: ${msg.filesModified.join(', ')}]`;
+          }
+          return {
+            role: msg.role === "assistant" ? "model" : "user",
+            parts: [{ text: content }],
+          };
+        }) || [];
 
       // CRITICAL: Environment context preamble with MODIFY-not-REPLACE rule
       const environmentContext = `
