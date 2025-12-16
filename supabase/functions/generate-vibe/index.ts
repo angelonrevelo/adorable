@@ -342,26 +342,26 @@ CRITICAL:
     required: ["thought", "message", "files"]
   };
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+  // Use fallback helper (primary model should work, but just in case)
+  const response = await callGeminiWithFallback(
+    `https://generativelanguage.googleapis.com/v1beta/models/\${model}:generateContent?key=${GEMINI_API_KEY}`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: messages,
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: {
-          temperature: 0.3, // Lower temp for corrections
-          maxOutputTokens: 32768,
-          responseMimeType: "application/json",
-          responseSchema: multiFileSchema
-        },
-      }),
-    }
+      contents: messages,
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: {
+        temperature: 0.3, // Lower temp for corrections
+        maxOutputTokens: 32768,
+        responseMimeType: "application/json",
+        responseSchema: multiFileSchema
+      },
+    },
+    GEMINI_API_KEY,
+    model,
+    ["gemini-1.5-flash"] // Simple fallback for corrections
   );
 
   if (!response.ok) {
-    console.error("Self-correction API call failed");
+    console.error("Self-correction API call failed after all fallbacks");
     return files; // Return original if correction fails
   }
 
@@ -383,6 +383,84 @@ CRITICAL:
   }
 }
 
+// =====================
+// MODEL FALLBACK HELPER
+// =====================
+/**
+ * Calls Gemini API with automatic fallback to alternative models on failure
+ */
+async function callGeminiWithFallback(
+  endpoint: string,
+  body: any,
+  GEMINI_API_KEY: string,
+  primaryModel: string,
+  fallbackModels: string[]
+): Promise<Response> {
+  const models = [primaryModel, ...fallbackModels];
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    const isLastAttempt = i === models.length - 1;
+
+    try {
+      console.log(`Attempting with model: ${model} (attempt ${i + 1}/${models.length})`);
+
+      const url = endpoint.replace('${model}', model);
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      // If 404 or model not found, try next model
+      if (response.status === 404) {
+        const errorText = await response.text();
+        console.error(`Model ${model} not found (404):`, errorText);
+
+        if (!isLastAttempt) {
+          console.log(`Falling back to next model: ${models[i + 1]}`);
+          continue;
+        } else {
+          throw new Error(`All models failed. Last error: ${errorText}`);
+        }
+      }
+
+      // If rate limit (429), wait and retry same model
+      if (response.status === 429 && i < 2) {
+        console.log(`Rate limited on ${model}, waiting 2s before retry`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        i--; // Retry same model
+        continue;
+      }
+
+      // If successful or non-recoverable error, return
+      if (response.ok || isLastAttempt) {
+        if (response.ok) {
+          console.log(`✓ Success with model: ${model}`);
+        }
+        return response;
+      }
+
+      // Other errors - try fallback
+      const errorText = await response.text();
+      console.error(`Model ${model} failed (${response.status}):`, errorText.slice(0, 200));
+
+      if (!isLastAttempt) {
+        console.log(`Falling back to next model: ${models[i + 1]}`);
+        continue;
+      }
+
+    } catch (networkError) {
+      console.error(`Network error with ${model}:`, networkError);
+      if (isLastAttempt) {
+        throw networkError;
+      }
+      console.log(`Trying next model due to network error`);
+    }
+  }
+
+  throw new Error("All model attempts exhausted");
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -400,6 +478,10 @@ serve(async (req) => {
     console.log("Received request:", { type, promptLength: prompt?.length, historyLength: history?.length });
 
     // Smart model selection based on task complexity
+    // AVAILABLE MODELS (as of Dec 2024):
+    // - gemini-2.0-flash-exp - Fast, stable (recommended)
+    // - gemini-1.5-flash - Legacy stable
+    // - gemini-1.5-pro - High quality fallback
     const isComplexTask =
       type === "generate-plan" || // Planning always needs Pro
       (prompt && (
@@ -411,9 +493,12 @@ serve(async (req) => {
         (projectFiles && projectFiles.length > 5) // Large projects
       ));
 
-    const model = isComplexTask
-      ? "gemini-2.0-flash-thinking-exp-01-21" // Advanced thinking for complex tasks
-      : "gemini-2.0-flash-001"; // Fast for simple tasks
+    // Model selection with fallback chain
+    const PRIMARY_MODEL = "gemini-2.0-flash-exp"; // Fixed: was gemini-2.0-flash-thinking-exp-01-21 (invalid)
+    const FALLBACK_MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"];
+
+    let model = PRIMARY_MODEL;
+    let modelAttemptCount = 0;
 
     console.log(`Selected model: ${model} (complex: ${isComplexTask})`);
 
@@ -551,27 +636,29 @@ Respond with JSON: {"thought": "...", "message": "...", "files": [{"path": "..."
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "thinking" })}\n\n`));
 
           try {
-            // Call Gemini streaming API
-            const response = await fetch(
-              `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${GEMINI_API_KEY}`,
+            // Call Gemini streaming API with fallback
+            const response = await callGeminiWithFallback(
+              `https://generativelanguage.googleapis.com/v1beta/models/\${model}:streamGenerateContent?key=${GEMINI_API_KEY}`,
               {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  contents: messages,
-                  systemInstruction: { parts: [{ text: multiFileSystemPrompt }] },
-                  generationConfig: {
-                    temperature: 0.7,
-                    maxOutputTokens: 32768,
-                  },
-                }),
-              }
+                contents: messages,
+                systemInstruction: { parts: [{ text: multiFileSystemPrompt }] },
+                generationConfig: {
+                  temperature: 0.7,
+                  maxOutputTokens: 32768,
+                },
+              },
+              GEMINI_API_KEY,
+              model,
+              FALLBACK_MODELS
             );
 
             if (!response.ok) {
               const errorText = await response.text();
-              console.error("Gemini streaming error:", response.status, errorText);
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: errorText })}\n\n`));
+              console.error("Gemini streaming error after all fallbacks:", response.status, errorText);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: "error",
+                message: `AI model unavailable (tried ${[model, ...FALLBACK_MODELS].join(', ')}). ${errorText}`
+              })}\n\n`));
               controller.close();
               return;
             }
@@ -824,23 +911,23 @@ ${prompt}
 
 Respond with ONLY the JSON plan, no additional text.`;
 
-      const planResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+      const planResponse = await callGeminiWithFallback(
+        `https://generativelanguage.googleapis.com/v1beta/models/\${model}:generateContent?key=${GEMINI_API_KEY}`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: planningPrompt }] }],
-            generationConfig: {
-              temperature: 0.5,
-              maxOutputTokens: 4096,
-            },
-          }),
-        }
+          contents: [{ role: "user", parts: [{ text: planningPrompt }] }],
+          generationConfig: {
+            temperature: 0.5,
+            maxOutputTokens: 4096,
+          },
+        },
+        GEMINI_API_KEY,
+        model,
+        FALLBACK_MODELS
       );
 
       if (!planResponse.ok) {
-        throw new Error(`Gemini API error: ${planResponse.status}`);
+        const errorText = await planResponse.text();
+        throw new Error(`Gemini API error after all fallbacks: ${planResponse.status} - ${errorText}`);
       }
 
       const planData = await planResponse.json();
@@ -2451,25 +2538,22 @@ export default App;`,
 
     console.log("Generation config:", JSON.stringify({ type, hasSchema: !!generationConfig.responseSchema }));
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+    const response = await callGeminiWithFallback(
+      `https://generativelanguage.googleapis.com/v1beta/models/\${model}:generateContent?key=${GEMINI_API_KEY}`,
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: messages,
-          systemInstruction,
-          generationConfig,
-        }),
+        contents: messages,
+        systemInstruction,
+        generationConfig,
       },
+      GEMINI_API_KEY,
+      model,
+      FALLBACK_MODELS
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
-      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+      console.error("Gemini API error after all fallbacks:", response.status, errorText);
+      throw new Error(`AI model unavailable (tried ${[model, ...FALLBACK_MODELS].join(', ')}): ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
