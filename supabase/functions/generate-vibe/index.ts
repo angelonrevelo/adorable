@@ -418,6 +418,80 @@ serve(async (req) => {
     console.log(`Selected model: ${model} (complex: ${isComplexTask})`);
 
     // =====================
+    // CONVERSATIONAL PROMPT DETECTION (Dynamic)
+    // =====================
+    // Detect if user is being conversational vs asking for code
+    // Uses intelligent heuristics instead of hardcoded patterns
+    const detectConversational = (text: string): boolean => {
+      if (!text) return false;
+
+      const trimmed = text.trim().toLowerCase();
+      const words = trimmed.split(/\s+/);
+
+      // 1. Very short messages (1-2 words) that don't contain code keywords
+      const codeKeywords = [
+        'build', 'create', 'make', 'add', 'modify', 'update', 'fix', 'change',
+        'component', 'page', 'app', 'button', 'form', 'input', 'list', 'table',
+        'game', 'dashboard', 'landing', 'website', 'ui', 'interface', 'feature'
+      ];
+
+      if (words.length <= 2 && !codeKeywords.some(kw => trimmed.includes(kw))) {
+        return true;
+      }
+
+      // 2. Greetings
+      const greetings = ['hi', 'hello', 'hey', 'yo', 'sup'];
+      if (greetings.includes(trimmed)) {
+        return true;
+      }
+
+      // 3. Simple acknowledgments
+      const acknowledgments = ['ok', 'okay', 'yes', 'no', 'sure', 'cool', 'nice', 'thanks', 'thank you'];
+      if (acknowledgments.includes(trimmed)) {
+        return true;
+      }
+
+      // 4. Random gibberish (random letters with no code intent)
+      // If it's short and has no vowels or common code patterns
+      if (words.length === 1 && words[0].length <= 10) {
+        const hasCodePattern = /\w+(app|bot|ui|api|page|list|form|btn)/.test(trimmed);
+        if (!hasCodePattern && !/[aeiou].*[aeiou]/.test(trimmed)) {
+          return true; // Likely gibberish like "asdaddad", "xyzw"
+        }
+      }
+
+      return false;
+    };
+
+    const isConversational = prompt && detectConversational(prompt);
+
+    if (isConversational) {
+      console.log(`Detected conversational prompt: "${prompt}" - Providing helpful response instead of code generation`);
+    }
+
+    if (isConversational && type === "generate-stream") {
+      console.log("Returning conversational response via SSE stream");
+
+      // Return a friendly response asking what they want to build
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+            type: "done",
+            thought: "## User Greeted or Sent Short Message\n\nI detected a conversational message rather than a code request. I'm here to help you build React applications!\n\nTo get started, try describing what you want to build, for example:\n- \"Build a todo list app\"\n- \"Create a weather dashboard\"\n- \"Make a landing page for a coffee shop\"\n- \"Build a tic-tac-toe game\"\n\nI can create complete React applications with multiple files, routing, state management, and beautiful UI using Tailwind CSS.",
+            message: "Hi! I'm ready to help you build something. What would you like to create?",
+            files: []
+          })}\n\n`));
+          controller.close();
+        }
+      });
+
+      return new Response(stream, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    }
+
+    // =====================
     // STREAMING HANDLER (SSE)
     // =====================
     if (type === "generate-stream") {
@@ -812,6 +886,21 @@ Respond with ONLY the JSON plan, no additional text.`;
       ];
       systemInstruction = undefined;
     } else if (type === "generate-multifile") {
+      // Check for conversational prompts in non-streaming mode
+      if (isConversational) {
+        console.log("Returning conversational response (non-streaming)");
+        return new Response(
+          JSON.stringify({
+            thought: "## User Greeted or Sent Short Message\n\nI detected a conversational message rather than a code request. I'm here to help you build React applications!\n\nTo get started, try describing what you want to build, for example:\n- \"Build a todo list app\"\n- \"Create a weather dashboard\"\n- \"Make a landing page for a coffee shop\"\n- \"Build a tic-tac-toe game\"\n\nI can create complete React applications with multiple files, routing, state management, and beautiful UI using Tailwind CSS.",
+            message: "Hi! I'm ready to help you build something. What would you like to create?",
+            files: []
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
       // Multi-file React generation with environment context
       const conversationHistory =
         history?.map((msg: { role: string; content: string; filesModified?: string[] }) => {

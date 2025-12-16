@@ -22,12 +22,12 @@ export function validatePrompt(prompt: string, contextTokens: number = 0): Valid
   const warnings: string[] = [];
   let sanitized = prompt;
 
-  // 1. Check if prompt is empty or too short
+  // 1. Check if prompt is empty (allow short conversational prompts)
   if (!prompt || prompt.trim().length === 0) {
     errors.push('Prompt cannot be empty');
-  } else if (prompt.trim().length < 3) {
-    errors.push('Prompt is too short. Please provide more detail.');
   }
+  // Note: Removed minimum length check to allow conversational prompts like "hi", "ok", etc.
+  // The backend will handle these gracefully
 
   // 2. Check if prompt is too long
   const estimatedTokens = estimateTokens(prompt);
