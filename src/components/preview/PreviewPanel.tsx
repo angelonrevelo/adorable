@@ -6,8 +6,9 @@ import {
     useSandpack,
 } from '@codesandbox/sandpack-react';
 import { useProjectStore } from '@/stores/useProjectStore';
-import { Monitor, Smartphone, Tablet, Terminal, RefreshCw, ExternalLink, Maximize2 } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, Terminal, RefreshCw, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SystemConsole } from '@/components/SystemConsole';
 
 type ViewportSize = 'desktop' | 'tablet' | 'mobile';
 
@@ -69,8 +70,11 @@ function PreviewToolbar() {
     );
 }
 
+type ConsoleTab = 'app' | 'system';
+
 function PreviewContent() {
     const [showConsole, setShowConsole] = useState(false);
+    const [consoleTab, setConsoleTab] = useState<ConsoleTab>('system');
     const [viewport, setViewport] = useState<ViewportSize>('desktop');
     const { sandpack } = useSandpack();
     const { setSandpackError, clearSandpackError } = useProjectStore();
@@ -109,15 +113,35 @@ function PreviewContent() {
                 </div>
 
                 <div className="flex items-center gap-1">
+                    {/* System Console toggle */}
                     <button
-                        onClick={() => setShowConsole(!showConsole)}
+                        onClick={() => {
+                            setShowConsole(true);
+                            setConsoleTab('system');
+                        }}
+                        className={cn(
+                            'p-1.5 rounded transition-colors flex items-center gap-1',
+                            showConsole && consoleTab === 'system'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'text-gray-500 hover:text-white hover:bg-white/5'
+                        )}
+                        title="System Console"
+                    >
+                        <Activity className="w-4 h-4" />
+                    </button>
+                    {/* App Console toggle */}
+                    <button
+                        onClick={() => {
+                            setShowConsole(true);
+                            setConsoleTab('app');
+                        }}
                         className={cn(
                             'p-1.5 rounded transition-colors',
-                            showConsole
+                            showConsole && consoleTab === 'app'
                                 ? 'bg-purple-500/20 text-purple-400'
                                 : 'text-gray-500 hover:text-white hover:bg-white/5'
                         )}
-                        title="Toggle Console"
+                        title="App Console"
                     >
                         <Terminal className="w-4 h-4" />
                     </button>
@@ -148,10 +172,54 @@ function PreviewContent() {
 
             {/* Console - fixed height at bottom */}
             {showConsole && (
-                <div className="h-48 border-t border-white/10 bg-[#0a0a0f] flex-shrink-0">
-                    <SandpackConsole
-                        style={{ height: '100%' }}
-                    />
+                <div className="h-56 border-t border-white/10 bg-[#0a0a0f] flex-shrink-0 flex flex-col">
+                    {/* Console tabs */}
+                    <div className="flex items-center border-b border-white/10 bg-[#111118] px-2">
+                        <button
+                            onClick={() => setConsoleTab('system')}
+                            className={cn(
+                                'px-3 py-1.5 text-xs font-medium border-b-2 transition-colors',
+                                consoleTab === 'system'
+                                    ? 'border-yellow-400 text-yellow-400'
+                                    : 'border-transparent text-gray-500 hover:text-white'
+                            )}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <Activity className="w-3 h-3" />
+                                System
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setConsoleTab('app')}
+                            className={cn(
+                                'px-3 py-1.5 text-xs font-medium border-b-2 transition-colors',
+                                consoleTab === 'app'
+                                    ? 'border-purple-400 text-purple-400'
+                                    : 'border-transparent text-gray-500 hover:text-white'
+                            )}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <Terminal className="w-3 h-3" />
+                                App
+                            </span>
+                        </button>
+                        <div className="flex-1" />
+                        <button
+                            onClick={() => setShowConsole(false)}
+                            className="p-1 text-gray-500 hover:text-white"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    
+                    {/* Console content */}
+                    <div className="flex-1 overflow-hidden">
+                        {consoleTab === 'system' ? (
+                            <SystemConsole />
+                        ) : (
+                            <SandpackConsole style={{ height: '100%' }} />
+                        )}
+                    </div>
                 </div>
             )}
         </div>

@@ -65,6 +65,13 @@ function buildFileTree(files: ProjectFile[]): FileTreeNode[] {
     return sortNodes(root);
 }
 
+// Pending operations for confirmation
+interface PendingChanges {
+    thought?: string;
+    message?: string;
+    operations: FileOperation[];
+}
+
 interface ProjectStore {
     // Project state
     project: Project | null;
@@ -81,6 +88,9 @@ interface ProjectStore {
 
     // Error state for Sandpack
     sandpackError: string | null;
+
+    // Pending changes for confirmation
+    pendingChanges: PendingChanges | null;
 
     // Project actions
     createProject: (name: string, templateFiles?: Omit<ProjectFile, 'id'>[]) => void;
@@ -108,6 +118,11 @@ interface ProjectStore {
     // Error actions
     setSandpackError: (error: string | null) => void;
     clearSandpackError: () => void;
+
+    // Pending changes actions
+    setPendingChanges: (changes: PendingChanges | null) => void;
+    confirmPendingChanges: () => void;
+    rejectPendingChanges: () => void;
 }
 
 export const useProjectStore = create<ProjectStore>((set, get) => ({
@@ -120,6 +135,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     messages: [],
     isGenerating: false,
     sandpackError: null,
+    pendingChanges: null,
 
     // Project actions
     createProject: (name, templateFiles) => {
@@ -347,5 +363,22 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     clearSandpackError: () => {
         set({ sandpackError: null });
+    },
+
+    // Pending changes actions
+    setPendingChanges: (changes) => {
+        set({ pendingChanges: changes });
+    },
+
+    confirmPendingChanges: () => {
+        const { pendingChanges } = get();
+        if (pendingChanges) {
+            get().applyFileOperations(pendingChanges.operations);
+            set({ pendingChanges: null });
+        }
+    },
+
+    rejectPendingChanges: () => {
+        set({ pendingChanges: null });
     },
 }));
