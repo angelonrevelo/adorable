@@ -224,6 +224,20 @@ You MUST respond with this exact JSON structure:
     - FOR GAMES: Use Canvas API to draw shapes, NOT image files
     - FOR PLACEHOLDERS: Use https://image.pollinations.ai/prompt/description
     - Use Tailwind CSS classes and gradients for styling, NOT custom images
+15. **PRESERVE EXISTING CODE** (CRITICAL - Prevents accidental deletion):
+    - When modifying files, read the ENTIRE existing content carefully
+    - Preserve ALL existing functionality unless explicitly asked to remove it
+    - Only modify the SPECIFIC parts mentioned by the user
+    - NEVER replace a working file with a minimal placeholder or TODO
+    - If user says vague things like "it's gone", "it's missing", "not working":
+      * DO NOT assume you should replace everything
+      * Instead, ask for clarification about what specifically is wrong
+      * Restore the previous working version if you accidentally deleted something
+    - Before modifying a file, explicitly note what you're preserving vs changing
+    - Example: User says "the pieces are moving wrong"
+      * CORRECT: Fix ONLY the movement validation logic, keep all other code intact
+      * WRONG: Replace entire file with a TODO comment
+    - If you're unsure what to preserve, ASK the user for clarification
 
 ## PROMPT VERSION: ${PROMPT_VERSION}`;
 
@@ -2904,7 +2918,7 @@ export default App;
     if (parsed.files && Array.isArray(parsed.files)) {
       debugLog.push(`[DEBUG] Processing ${parsed.files.length} files`);
 
-      // Log code changes with diffs
+      // Log code changes with diffs AND validate for dangerous content shrinkage
       for (const file of parsed.files) {
         const existingFile = projectFiles?.find((f: any) => f.path === file.path);
         const operation = file.action === 'delete' ? 'delete' :
@@ -2916,6 +2930,57 @@ export default App;
           existingFile?.content,
           file.content
         );
+
+        // CRITICAL VALIDATION: Prevent AI from accidentally deleting code
+        if (existingFile && file.action !== 'delete' && file.content.length < existingFile.content.length * 0.4) {
+          const reductionPercent = Math.round((1 - file.content.length / existingFile.content.length) * 100);
+
+          logger.error('validation', `CRITICAL: ${file.path} shrunk by ${reductionPercent}%`, {
+            oldSize: existingFile.content.length,
+            newSize: file.content.length,
+            reduction: `${reductionPercent}%`,
+            suspectedIssue: 'AI may have replaced working code with placeholder'
+          });
+
+          // Check if new content is just a placeholder
+          const isPlaceholder =
+            file.content.includes('TODO') ||
+            file.content.includes('// Implement') ||
+            file.content.length < 500;
+
+          if (isPlaceholder) {
+            logger.error('validation', `REJECTED: ${file.path} appears to be a placeholder replacing real code`);
+
+            return new Response(JSON.stringify({
+              error: `I apologize, but I cannot apply these changes. I attempted to replace "${file.path}" (${existingFile.content.length} chars) with much smaller content (${file.content.length} chars, ${reductionPercent}% reduction) that appears to be a placeholder.
+
+This would delete important working code.
+
+**What went wrong:**
+Your prompt may have been too vague for me to understand what to preserve.
+
+**How to fix this:**
+Please be more specific about what you want to change. For example:
+- Instead of "it's gone" → "The chess board disappeared, please restore it"
+- Instead of "not working" → "The piece movement validation is broken, fix the isValidMove function"
+- Instead of "wrong" → "Pawns are moving backwards, they should only move forward"
+
+The more specific you are, the better I can help without accidentally removing working features.`,
+              _logs: {
+                entries: logger.getAllLogs(),
+                summary: logger.getSummary()
+              }
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+          }
+        }
+
+        // Warn about suspiciously small new files
+        if (operation === 'create' && file.content.length < 200 && !file.path.endsWith('.css')) {
+          logger.warn('validation', `New file ${file.path} is very small (${file.content.length} chars) - might be incomplete`);
+        }
       }
 
       parsed.files = parsed.files.map((file: { path: string; content: string; action: string }) => {
