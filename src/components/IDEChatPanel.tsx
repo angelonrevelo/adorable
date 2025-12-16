@@ -211,8 +211,13 @@ export function IDEChatPanel() {
                 }
             }
 
-            // Combine with manual knowledge input
-            const fullContext = (knowledgeInput ? `MANUAL KNOWLEDGE:\n${knowledgeInput}\n` : '') + attachmentContext;
+            // Combine with manual knowledge input and sandbox state
+            let fullContext = (knowledgeInput ? `MANUAL KNOWLEDGE:\n${knowledgeInput}\n` : '') + attachmentContext;
+
+            // CRITICAL: Add current sandbox error context if exists
+            if (sandpackError) {
+                fullContext += `\n\n=== CURRENT ERROR IN SANDBOX ===\n${sandpackError}\n\nIMPORTANT: The user's app is currently showing this error. If your changes are related, make sure to fix it.\n`;
+            }
 
             // Use streaming generator
             for await (const event of generateVibeStream(userInput, history, projectFiles, fullContext)) {
@@ -351,7 +356,8 @@ export function IDEChatPanel() {
         setGenerating(true);
         startSession();
 
-        const projectFiles = Array.from(files.values());
+        // Track files modified across phases
+        const phaseHistory: string[] = [];
 
         try {
             for (let i = 0; i < phaseCount; i++) {
@@ -361,9 +367,12 @@ export function IDEChatPanel() {
 
                 logSystem(`Phase ${i + 1}/${phaseCount}: ${phase.name}`);
 
-                // Build phase-specific prompt
+                // CRITICAL FIX: Get CURRENT state of files for EACH phase
+                const currentProjectFiles = Array.from(files.values());
+
+                // Build context-aware phase prompt with full history
                 const phasePrompt = `
-Execute Phase ${i + 1}: ${phase.name}
+Execute Phase ${i + 1}/${phaseCount}: ${phase.name}
 
 Description: ${phase.description}
 
@@ -373,7 +382,27 @@ Files to modify: ${phase.filesToModify.join(', ') || 'None'}
 Validation criteria:
 ${phase.validationCriteria.map(c => `- ${c}`).join('\n')}
 
-IMPORTANT: This is part of a larger plan. Execute ONLY this phase. Make the code production-ready with proper styling, animations, and error handling.
+${phaseHistory.length > 0 ? `
+=== CONTEXT: What You've Built So Far ===
+${phaseHistory.join('\n')}
+
+IMPORTANT: The files listed above were created/modified in previous phases and ARE AVAILABLE for you to use/import.
+` : ''}
+
+${sandpackError ? `
+=== CURRENT ERROR IN SANDBOX ===
+${sandpackError}
+
+IMPORTANT: Fix this error if it's related to your phase.
+` : ''}
+
+CRITICAL INSTRUCTIONS:
+- This is Phase ${i + 1} of a ${phaseCount}-phase plan
+- Previous phases have already executed - their files exist and are available
+- Execute ONLY this phase's requirements
+- Check the current project files to see what already exists
+- Make the code production-ready with proper styling, animations, and error handling
+- If importing files from previous phases, they WILL be available
 `.trim();
 
                 addMessage({
@@ -385,8 +414,8 @@ IMPORTANT: This is part of a larger plan. Execute ONLY this phase. Make the code
                 let phaseThought = '';
                 let phaseMessage = '';
 
-                // Execute the phase
-                for await (const event of generateVibeStream(phasePrompt, messages, projectFiles, '')) {
+                // Execute the phase with CURRENT file state
+                for await (const event of generateVibeStream(phasePrompt, messages, currentProjectFiles, '')) {
                     if (event.type === 'done') {
                         phaseFiles = event.files || [];
                         phaseThought = event.thought || '';
@@ -400,6 +429,12 @@ IMPORTANT: This is part of a larger plan. Execute ONLY this phase. Make the code
                 if (phaseFiles.length > 0) {
                     applyFileOperations(phaseFiles);
                     logSystem(`Phase ${i + 1} complete: ${phaseFiles.length} files modified`);
+
+                    // CRITICAL: Track what was built for next phase's context
+                    const phaseFileSummary = phaseFiles.map(f =>
+                        `Phase ${i + 1} ${f.action === 'create' ? 'CREATED' : 'MODIFIED'}: ${f.path}`
+                    ).join('\n');
+                    phaseHistory.push(phaseFileSummary);
                 }
 
                 addMessage({
@@ -411,8 +446,8 @@ IMPORTANT: This is part of a larger plan. Execute ONLY this phase. Make the code
 
                 updatePhaseStatus(phase.id, 'complete');
 
-                // Small delay between phases for UI feedback
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // Small delay between phases for UI feedback and file system sync
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
             logSystem('All phases complete!');
