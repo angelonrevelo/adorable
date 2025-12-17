@@ -9,8 +9,9 @@ const corsHeaders = {
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
 // Prompt template versioning for A/B testing and tracking improvements
-const PROMPT_VERSION = "3.0.0"; // EXTENDED THINKING MODE - Deep autonomous reasoning
+const PROMPT_VERSION = "3.0.1"; // VAGUE PROMPT DETECTION FIX
 const PROMPT_CHANGELOG = {
+  "3.0.1": "Fixed vague prompt detection: expanded patterns (+15), increased char limit (15→25), added regex for 'make it better'/'fix it'",
   "3.0.0": "Extended thinking with 7-phase analysis, 1600+ token minimum reasoning, autonomous architecture evaluation",
   "2.1.0": "Added edge cases, accessibility, performance, and error handling rules",
   "2.0.0": "Multi-file system with SCoT, few-shot examples",
@@ -421,7 +422,7 @@ function validateGeneratedCode(files: any[]): ValidationIssue[] {
 
     // Check for React usage without import
     if ((content.includes('useState') || content.includes('useEffect') || content.includes('React.'))
-        && !imports.some((imp: string) => imp.includes('react'))) {
+      && !imports.some((imp: string) => imp.includes('react'))) {
       issues.push({
         type: 'error',
         file: file.path,
@@ -782,17 +783,28 @@ serve(async (req) => {
       const trimmed = text.trim().toLowerCase();
       const words = trimmed.split(/\s+/);
 
-      // Vague phrases that don't specify WHAT to fix
+      // Vague phrases that don't specify WHAT to fix (EXPANDED in v3.0.1)
       const vaguePatterns = [
-        'its gone', 'it\'s gone', 'its missing', 'it\'s missing',
-        'not working', 'doesn\'t work', 'broken', 'not right',
-        'its still', 'it\'s still', 'still not', 'still',
-        'check the code', 'check it', 'look at', 'see',
-        'wrong', 'incorrect', 'bad', 'weird', 'strange'
+        // Existence complaints
+        'its gone', 'it\'s gone', 'its missing', 'it\'s missing', 'disappeared',
+        // Status complaints
+        'not working', 'doesn\'t work', 'doesnt work', 'broken', 'not right',
+        'its still', 'it\'s still', 'still not', 'still wrong', 'still broken',
+        // Review requests
+        'check the code', 'check it', 'look at', 'see', 'review',
+        // Quality complaints
+        'wrong', 'incorrect', 'bad', 'weird', 'strange', 'ugly', 'sucks',
+        // Fix/redo requests without specifics
+        'fix it', 'fix this', 'redo', 'redo it', 'try again', 'do it again',
+        // Vague improvement requests
+        'make it better', 'make it good', 'make it work', 'improve it',
+        'you messed up', 'messed it up', 'ruined it', 'broke it',
+        // Simple negatives
+        'no', 'nope', 'that\'s not', 'thats not'
       ];
 
-      // If prompt is short (<15 chars) and matches vague pattern
-      if (trimmed.length < 15 && vaguePatterns.some(pattern => trimmed.includes(pattern))) {
+      // If prompt is short (<=25 chars) and matches vague pattern (FIXED: was <15)
+      if (trimmed.length <= 25 && vaguePatterns.some(pattern => trimmed.includes(pattern))) {
         return true;
       }
 
@@ -802,6 +814,18 @@ serve(async (req) => {
         if (!hasSpecifics && vaguePatterns.some(pattern => trimmed.includes(pattern))) {
           return true;
         }
+      }
+
+      // Catch "make X better/good" or "fix X" patterns without specifics (NEW in v3.0.1)
+      const vagueActionPatterns = [
+        /^make\s+(it|this|that)\s+(better|good|work|nice|look\s+good)$/i,
+        /^fix\s+(it|this|that)$/i,
+        /^(redo|undo|revert)\s*(it|this|that)?$/i,
+        /^try\s+(again|once\s+more)$/i
+      ];
+
+      if (vagueActionPatterns.some(pattern => pattern.test(trimmed))) {
+        return true;
       }
 
       return false;
@@ -2977,7 +3001,7 @@ export default App;
       for (const file of parsed.files) {
         const existingFile = projectFiles?.find((f: any) => f.path === file.path);
         const operation = file.action === 'delete' ? 'delete' :
-                         existingFile ? 'modify' : 'create';
+          existingFile ? 'modify' : 'create';
 
         logger.logCodeChange(
           operation,
