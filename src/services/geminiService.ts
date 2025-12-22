@@ -88,15 +88,9 @@ export async function* generateVibeStream(
     sysConsole.logTokenBudget(remaining, percentage, 'ok');
   }
 
-  // Get the Supabase URL from env
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    console.error('Supabase env vars missing:', { supabaseUrl: !!supabaseUrl, supabaseKey: !!supabaseKey });
-    yield { type: 'error', error: 'Supabase configuration missing' };
-    return;
-  }
+  // Hardcoded Supabase configuration (VITE_* vars not supported)
+  const supabaseUrl = 'https://uwclgmhirtcluxnqkkms.supabase.co';
+  const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3Y2xnbWhpcnRjbHV4bnFra21zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzOTc1ODcsImV4cCI6MjA4MTk3MzU4N30.ce_p9ybVjZd42jyTF0FeLnD6I6VBIlrCinh2vprnaIU';
 
   // Log files being sent
   relevantFiles.forEach(f => {
