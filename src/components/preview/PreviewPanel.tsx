@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
     SandpackProvider,
     SandpackPreview,
@@ -6,7 +6,7 @@ import {
     useSandpack,
 } from '@codesandbox/sandpack-react';
 import { useProjectStore } from '@/stores/useProjectStore';
-import { Monitor, Smartphone, Tablet, Terminal, RefreshCw, Activity } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, Terminal, RefreshCw, Activity, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SystemConsole } from '@/components/SystemConsole';
 
@@ -239,7 +239,7 @@ export function PreviewPanel() {
             result[sandpackPath] = file.content;
         });
 
-        // Ensure we have required files
+        // Ensure we have index.html with proper entry script
         if (!result['/index.html']) {
             result['/index.html'] = `<!DOCTYPE html>
 <html>
@@ -251,8 +251,36 @@ export function PreviewPanel() {
   </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>`;
+        }
+
+        // Ensure we have main.tsx entry point
+        if (!result['/src/main.tsx']) {
+            result['/src/main.tsx'] = `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);`;
+        }
+
+        // Ensure we have a basic App component
+        if (!result['/src/App.tsx']) {
+            result['/src/App.tsx'] = `export default function App() {
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <h1 className="text-3xl font-bold">Welcome</h1>
+        <p className="text-gray-400">Start building your app!</p>
+      </div>
+    </div>
+  );
+}`;
         }
 
         return result;
@@ -288,16 +316,18 @@ export function PreviewPanel() {
                         autorun: true,
                         autoReload: true,
                         recompileMode: 'delayed',
-                        recompileDelay: 500,
+                        recompileDelay: 700,
+                        bundlerURL: 'https://sandpack-bundler.codesandbox.io',
                         externalResources: [
                             "https://cdn.tailwindcss.com",
                         ],
                     }}
                     customSetup={{
                         dependencies: {
+                            // Core React
                             'react': '^18.2.0',
                             'react-dom': '^18.2.0',
-                            // Routing - Full support for multi-page apps
+                            // Routing
                             'react-router-dom': '^6.20.0',
                             // Icons
                             'lucide-react': '^0.294.0',
@@ -307,58 +337,12 @@ export function PreviewPanel() {
                             'class-variance-authority': '^0.7.0',
                             // Animation
                             'framer-motion': '^10.16.4',
-                            // 3D Graphics
-                            'three': '^0.160.0',
-                            '@react-three/fiber': '^8.15.16',
-                            '@react-three/drei': '^9.99.0',
-                            // HTTP & Data Fetching
-                            'axios': '^1.6.0',
-                            '@tanstack/react-query': '^5.0.0',
-                            // Date utilities
-                            'date-fns': '^2.30.0',
-                            // Charts
-                            'recharts': '^2.9.0',
-                            // Radix UI Primitives - Full suite
+                            // Essential Radix UI
                             '@radix-ui/react-slot': '^1.0.2',
                             '@radix-ui/react-dialog': '^1.0.5',
                             '@radix-ui/react-dropdown-menu': '^2.0.0',
                             '@radix-ui/react-tabs': '^1.0.4',
                             '@radix-ui/react-tooltip': '^1.0.7',
-                            '@radix-ui/react-accordion': '^1.1.2',
-                            '@radix-ui/react-switch': '^1.0.3',
-                            '@radix-ui/react-checkbox': '^1.0.4',
-                            '@radix-ui/react-select': '^2.0.0',
-                            '@radix-ui/react-slider': '^1.1.2',
-                            '@radix-ui/react-progress': '^1.0.3',
-                            '@radix-ui/react-avatar': '^1.0.4',
-                            '@radix-ui/react-radio-group': '^1.1.3',
-                            '@radix-ui/react-label': '^2.0.2',
-                            '@radix-ui/react-popover': '^1.0.7',
-                            '@radix-ui/react-scroll-area': '^1.0.5',
-                            '@radix-ui/react-separator': '^1.0.3',
-                            '@radix-ui/react-toggle': '^1.0.3',
-                            '@radix-ui/react-toggle-group': '^1.0.4',
-                            '@radix-ui/react-context-menu': '^2.1.5',
-                            '@radix-ui/react-hover-card': '^1.0.7',
-                            '@radix-ui/react-menubar': '^1.0.4',
-                            '@radix-ui/react-navigation-menu': '^1.1.4',
-                            '@radix-ui/react-alert-dialog': '^1.0.5',
-                            '@radix-ui/react-aspect-ratio': '^1.0.3',
-                            '@radix-ui/react-collapsible': '^1.0.3',
-                            // Utilities
-                            'uuid': '^9.0.0',
-                            // State Management
-                            'zustand': '^4.4.0',
-                            // Validation & Forms
-                            'zod': '^3.22.0',
-                            'react-hook-form': '^7.48.0',
-                            '@hookform/resolvers': '^3.3.0',
-                            // Notifications
-                            'sonner': '^1.0.0',
-                            // Drag & Drop
-                            '@dnd-kit/core': '^6.1.0',
-                            '@dnd-kit/sortable': '^7.0.0',
-                            '@dnd-kit/utilities': '^3.2.0',
                         },
                         entry: '/src/main.tsx',
                     }}
