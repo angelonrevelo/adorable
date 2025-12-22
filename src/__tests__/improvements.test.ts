@@ -126,10 +126,8 @@ const mockFiles = new Map<string, ProjectFile>();
 mockFiles.set('test.tsx', {
   id: '1',
   path: 'test.tsx',
-  name: 'test.tsx',
   content: 'original content',
   language: 'tsx',
-  isOpen: false,
 });
 
 const snapshot1 = createFileSnapshot(mockFiles);
