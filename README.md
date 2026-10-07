@@ -1,73 +1,68 @@
-# Welcome to your Lovable project
+<p align="center">
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18">
+  <img src="https://img.shields.io/badge/TypeScript-Vite-3178C6?logo=typescript&logoColor=white" alt="TypeScript + Vite">
+  <img src="https://img.shields.io/badge/AI-Gemini-8E75B2?logo=googlegemini&logoColor=white" alt="Gemini">
+  <img src="https://img.shields.io/badge/status-private-lightgrey" alt="status: private">
+</p>
 
-## Project info
+# Adorable
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**An open-source take on Lovable: describe a React app in plain English and watch it get built and previewed live.**
 
-## How can I edit this code?
+You type what you want ("a pomodoro timer with a dark theme"), Gemini writes the
+files, and an in-browser Sandpack preview runs the result next to a Monaco code
+editor. Keep chatting to change it.
 
-There are several ways of editing your application.
+- **Instant mode** for quick edits, **Plan mode** for bigger builds that the AI
+  breaks into phases.
+- Multi-file projects saved to Postgres, so you can come back to them.
+- The AI sees the preview's console output and corrects its own errors.
 
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## Quick start
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm install
+npm run server:install      # server/ has its own package.json
+cp .env.example .env        # then fill in the keys below
+npm run server:migrate      # create the Postgres tables
+npm run dev:all             # Vite front end + API server together
 ```
 
-**Edit a file directly in GitHub**
+Other scripts: `npm run dev` (front end only), `npm run dev:server` (API only),
+`npm run build`, `npm run lint`, `npm run preview`.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Configuration
 
-**Use GitHub Codespaces**
+Front end (`.env`):
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- `VITE_API_URL` — base URL of the API server (defaults to `http://localhost:3002`).
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_PROJECT_ID`, `VITE_SUPABASE_PUBLISHABLE_KEY` — listed in `.env.example` for the Supabase client.
 
-## What technologies are used for this project?
+API server (`server/`):
 
-This project is built with:
+- `DATABASE_URL` — Postgres connection string for saved projects.
+- `GEMINI_API_KEY` — Google Gemini key used for code generation.
+- `PORT` — port the API listens on (defaults to `3001`; set it to match `VITE_API_URL`).
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Supabase edge function `generate-vibe` reads `GEMINI_API_KEY` from its function secrets.
 
-## How can I deploy this project?
+## How it works
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+```
+browser (React + Sandpack + Monaco)
+   │  prompt + current files + console output
+   ▼
+server/index.js (Express)  ──►  Gemini  ──►  generated files (JSON)
+   │
+   ▼
+Postgres (projects, files)
+```
 
-## Can I connect a custom domain to my Lovable project?
+`supabase/functions/generate-vibe` is an alternative Deno edge-function version
+of the generation step.
 
-Yes, you can!
+## More
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- [AI_SETUP_GUIDE.md](AI_SETUP_GUIDE.md) — full project orientation for agents
+- [USAGE_GUIDE.md](USAGE_GUIDE.md) — utility and component reference
+- [DEPLOYMENT.md](DEPLOYMENT.md) — deploying the edge function
